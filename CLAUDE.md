@@ -229,6 +229,23 @@ rewrite history (`git filter-repo --replace-text`) and force-push — don't leav
 - There is no auto-deploy pipeline yet — direct pushes during early scaffolding are acceptable, but
   prefer PRs once the app is in real use.
 
+### Author identity & co-authorship
+
+This is a **personal** repo — commits must use the personal identity, never the cisbox company
+email (the machine's global git config defaults to the company email, so set it locally per clone):
+
+```bash
+git config --local user.name "vodongha"
+git config --local user.email "vodongha@hotmail.com"
+```
+
+Commits made with AI assistance end with a co-author trailer (matching the `vodongha-personal`
+convention), using the actual model:
+
+```
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+```
+
 ## Gotchas (learned the hard way — read before debugging these)
 
 - **PyPI package is `oracledb`, not `python-oracledb`.** Installing `python-oracledb` fails with
