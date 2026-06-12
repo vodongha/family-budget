@@ -1,0 +1,56 @@
+"""Shared FastAPI dependencies: DB session, current user, current family (tenant scope)."""
+
+from typing import Annotated
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.database import get_session
+from app.core.security import decode_access_token
+from app.domains.users.models import User
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+SessionDep = Annotated[Session, Depends(get_session)]
+TokenDep = Annotated[str, Depends(oauth2_scheme)]
+
+_CREDENTIALS_ERROR = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Could not validate credentials",
+    headers={"WWW-Authenticate": "Bearer"},
+)
+
+
+def get_current_user(session: SessionDep, token: TokenDep) -> User:
+    claims = decode_access_token(token)
+    if claims is None:
+        raise _CREDENTIALS_ERROR
+    rid = claims.get("sub")
+    if not rid:
+        raise _CREDENTIALS_ERROR
+    user = session.scalar(select(User).where(User.rid == rid))
+    if user is None:
+        raise _CREDENTIALS_ERROR
+    return user
+
+
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def get_current_family(current_user: CurrentUser) -> int:
+    """The multi-tenant boundary: every scoped query must filter by this family_id.
+
+    Mirrors konfipay's CurrentUUID — repositories always receive it explicitly so
+    services stay stateless.
+    """
+    if current_user.family_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not attached to a family",
+        )
+    return current_user.family_id
+
+
+CurrentFamily = Annotated[int, Depends(get_current_family)]
