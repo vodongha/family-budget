@@ -14,6 +14,12 @@ together; every member sees the same data, scoped to their family. Multi-tenant 
 The architecture deliberately mirrors a layered service design (the author's day-job pattern):
 **router → service → repository**. Keep that separation; it is the backbone of the project.
 
+- **Wiki:** https://github.com/vodongha/family-budget/wiki (Architecture, Connection & Wallet,
+  Database & Migrations, API Reference, Testing, Git Workflow). Update the relevant wiki page when
+  behaviour it documents changes.
+- **CI:** `.github/workflows/ci.yml` runs `ruff check` + `pytest` (SQLite, no ADB) on pushes/PRs to
+  `master`. Keep it green.
+
 ## Technology stack
 
 | Layer | Technology |
