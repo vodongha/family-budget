@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
 from app.domains.auth.repository import AuthRepository
-from app.domains.users.models import User
+from app.domains.users.models import User, UserRole
 
 
 class EmailAlreadyRegisteredError(Exception):
@@ -26,11 +26,13 @@ class AuthService:
         if self._repo.get_user_by_email(email) is not None:
             raise EmailAlreadyRegisteredError(email)
         family = self._repo.add_family(family_name)
+        # The person who creates the family owns it.
         user = self._repo.add_user(
             email=email,
             hashed_password=hash_password(password),
             display_name=display_name,
             family_id=family.id,
+            role=UserRole.OWNER,
         )
         self._session.commit()
         return user

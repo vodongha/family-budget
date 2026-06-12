@@ -7,6 +7,7 @@ from alembic import context
 from app.core.database import Base, get_engine
 
 # Import models so their tables are registered on Base.metadata for autogenerate.
+from app.domains.invitations import models as invitation_models  # noqa: F401
 from app.domains.transactions import models as transaction_models  # noqa: F401
 from app.domains.users import models as user_models  # noqa: F401
 from app.domains.wallets import models as wallet_models  # noqa: F401

@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
+from app.domains.users.models import UserRole
+
 
 class Token(BaseModel):
     access_token: str
@@ -15,6 +17,7 @@ class UserRead(BaseModel):
     email: EmailStr
     display_name: str
     family_id: int | None
+    role: UserRole
 
 
 class RegisterRequest(BaseModel):

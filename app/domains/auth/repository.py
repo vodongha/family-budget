@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domains.users.models import Family, User
+from app.domains.users.models import Family, User, UserRole
 
 
 class AuthRepository:
@@ -20,13 +20,19 @@ class AuthRepository:
         return family
 
     def add_user(
-        self, email: str, hashed_password: str, display_name: str, family_id: int
+        self,
+        email: str,
+        hashed_password: str,
+        display_name: str,
+        family_id: int,
+        role: UserRole,
     ) -> User:
         user = User(
             email=email,
             hashed_password=hashed_password,
             display_name=display_name,
             family_id=family_id,
+            role=role.value,
         )
         self._session.add(user)
         self._session.flush()
