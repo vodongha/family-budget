@@ -46,3 +46,23 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def auth_headers(client: TestClient) -> dict[str, str]:
+    """Register a family + user and return Authorization headers for it."""
+    client.post(
+        "/auth/register",
+        json={
+            "email": "dad@example.com",
+            "password": "s3cret-pass",
+            "display_name": "Dad",
+            "family_name": "Vo Family",
+        },
+    )
+    login = client.post(
+        "/auth/login",
+        data={"username": "dad@example.com", "password": "s3cret-pass"},
+    )
+    token = login.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
