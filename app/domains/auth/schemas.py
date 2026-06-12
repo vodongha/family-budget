@@ -29,3 +29,7 @@ class RegisterRequest(BaseModel):
 
 class UpdateProfileRequest(BaseModel):
     display_name: str = Field(min_length=1, max_length=120)
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str

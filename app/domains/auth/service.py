@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.google import verify_google_id_token
 from app.core.security import create_access_token, hash_password, verify_password
 from app.domains.auth.repository import AuthRepository
 from app.domains.users.models import User, UserRole
@@ -45,8 +47,51 @@ class AuthService:
 
     def authenticate(self, email: str, password: str) -> User:
         user = self._repo.get_user_by_email(email)
-        if user is None or not verify_password(password, user.hashed_password):
+        # Google-only accounts have an empty password hash and cannot password-login.
+        if (
+            user is None
+            or not user.hashed_password
+            or not verify_password(password, user.hashed_password)
+        ):
             raise InvalidCredentialsError()
+        return user
+
+    def google_login(self, id_token: str) -> User:
+        """Sign in (or sign up) with a verified Google ID token.
+
+        Links the Google account to an existing user with the same email, or
+        creates a new family owned by the new user. Raises [GoogleAuthError] if
+        the token is invalid.
+        """
+        client_ids = [
+            c.strip() for c in settings.google_client_id.split(",") if c.strip()
+        ]
+        claims = verify_google_id_token(id_token, client_ids)
+        google_sub = claims["sub"]
+        email = claims["email"]
+        display_name = claims.get("name") or email.split("@")[0]
+
+        user = self._repo.get_user_by_google_sub(google_sub)
+        if user is None:
+            user = self._repo.get_user_by_email(email)
+        if user is not None:
+            # Link Google to this account on first Google sign-in.
+            if not user.google_sub:
+                user.google_sub = google_sub
+            self._session.commit()
+            return user
+
+        # Brand-new user — create their family and make them its owner.
+        family = self._repo.add_family(f"{display_name}'s Family")
+        user = self._repo.add_user(
+            email=email,
+            hashed_password="",
+            display_name=display_name,
+            family_id=family.id,
+            role=UserRole.OWNER,
+            google_sub=google_sub,
+        )
+        self._session.commit()
         return user
 
     def issue_token(self, user: User) -> str:
@@ -87,4 +132,7 @@ class AuthService:
                 family.deleted_at = now
         user.is_deleted = True
         user.deleted_at = now
+        # Unlink Google so the account is no longer reachable via the Google
+        # identity and the same Google account can be used again later.
+        user.google_sub = None
         self._session.commit()

@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     wallet_dir: str = "/app/wallet"
     wallet_password: str = ""
 
+    # Google Sign-In — the OAuth client ID(s) the backend accepts as the audience
+    # of incoming Google ID tokens. Comma-separated to allow web + Android + iOS
+    # client IDs at once. Empty disables Google login.
+    google_client_id: str = ""
+
     # JWT
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"

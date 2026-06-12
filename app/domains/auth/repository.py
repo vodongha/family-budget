@@ -18,6 +18,13 @@ class AuthRepository:
             select(User).where(User.email == email, User.is_deleted == false())
         )
 
+    def get_user_by_google_sub(self, google_sub: str) -> User | None:
+        return self._session.scalar(
+            select(User).where(
+                User.google_sub == google_sub, User.is_deleted == false()
+            )
+        )
+
     def get_family(self, family_id: int) -> Family | None:
         return self._session.get(Family, family_id)
 
@@ -46,6 +53,7 @@ class AuthRepository:
         display_name: str,
         family_id: int,
         role: UserRole,
+        google_sub: str | None = None,
     ) -> User:
         user = User(
             email=email,
@@ -53,6 +61,7 @@ class AuthRepository:
             display_name=display_name,
             family_id=family_id,
             role=role.value,
+            google_sub=google_sub,
         )
         self._session.add(user)
         self._session.flush()

@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.deps import CurrentUser, SessionDep
+from app.core.google import GoogleAuthError
 from app.domains.auth.schemas import (
+    GoogleLoginRequest,
     RegisterRequest,
     Token,
     UpdateProfileRequest,
@@ -51,6 +53,21 @@ def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
+    return Token(access_token=service.issue_token(user))
+
+
+@router.post("/google", response_model=Token)
+def google_login(payload: GoogleLoginRequest, session: SessionDep) -> Token:
+    """Sign in / sign up with a Google ID token obtained on the client."""
+    service = AuthService(session)
+    try:
+        user = service.google_login(payload.id_token)
+    except GoogleAuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
             headers={"WWW-Authenticate": "Bearer"},
         ) from None
     return Token(access_token=service.issue_token(user))
