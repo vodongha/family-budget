@@ -239,11 +239,12 @@ git config --local user.name "vodongha"
 git config --local user.email "vodongha@hotmail.com"
 ```
 
-Commits made with AI assistance end with a co-author trailer (matching the `vodongha-personal`
-convention), using the actual model:
+AI-assisted commits are **authored by Claude**, with the personal identity as committer (so the
+push still goes through the `vodongha` account). Use the actual model in the author name:
 
-```
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+```bash
+git commit --author="Claude Opus 4.8 <noreply@anthropic.com>" -m "..."
+# committer stays vodongha <vodongha@hotmail.com> (from local config)
 ```
 
 ## Gotchas (learned the hard way — read before debugging these)
