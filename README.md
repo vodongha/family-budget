@@ -20,6 +20,9 @@ income/expense together, scoped per family.
 - **Roles** — `owner` / `member`; the person who creates a family owns it
 - **Invitations** — owner invites by email; the invitee accepts with a token + a
   chosen password (auto-login); owner can revoke pending invites
+- **Profile & account deletion** — `PATCH /auth/me` (display name); `DELETE /auth/me`
+  self-service deletion (Google Play policy): soft-delete now + scheduled 30-day purge.
+  Owners must transfer ownership before deleting (sole owners tear down the whole family)
 - **Wallets** — create / list / get; balance is **derived** from transactions, never stored
 - **Transactions** — expense / income; positive integer amounts in đồng; family-scoped
 - **Dashboard** — `GET /dashboard/summary`: total income / expense / net + per-wallet balances

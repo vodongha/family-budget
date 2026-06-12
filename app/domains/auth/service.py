@@ -1,5 +1,7 @@
 """Auth business logic — stateless; the session is passed in per call."""
 
+from datetime import UTC, datetime
+
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
@@ -13,6 +15,10 @@ class EmailAlreadyRegisteredError(Exception):
 
 class InvalidCredentialsError(Exception):
     pass
+
+
+class OwnerMustTransferError(Exception):
+    """An owner with other active members cannot delete until ownership moves."""
 
 
 class AuthService:
@@ -47,3 +53,38 @@ class AuthService:
         return create_access_token(
             subject=user.rid, extra={"family_id": user.family_id}
         )
+
+    def update_display_name(self, user: User, display_name: str) -> User:
+        user.display_name = display_name
+        self._session.commit()
+        self._session.refresh(user)
+        return user
+
+    def delete_account(self, user: User) -> None:
+        """Soft-delete the user's account (Google Play account-deletion policy).
+
+        - An owner with other active members is blocked (must transfer ownership
+          first) so a family is never left without an owner.
+        - A sole owner also soft-deletes the family, marking all of its data for
+          purge by the scheduled job.
+        Login and token validation reject the user immediately; a scheduled job
+        purges/anonymises the data once the retention window has passed.
+        """
+        if user.is_deleted:
+            return
+        # Naive UTC, consistent with the other DateTime columns (func.now()).
+        now = datetime.now(UTC).replace(tzinfo=None)
+        if user.role == UserRole.OWNER.value and user.family_id is not None:
+            others = self._repo.count_active_members(
+                user.family_id, exclude_user_id=user.id
+            )
+            if others > 0:
+                raise OwnerMustTransferError()
+            # Sole owner — tear down the whole family.
+            family = self._repo.get_family(user.family_id)
+            if family is not None:
+                family.is_deleted = True
+                family.deleted_at = now
+        user.is_deleted = True
+        user.deleted_at = now
+        self._session.commit()

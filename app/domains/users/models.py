@@ -7,7 +7,7 @@ for anything exposed externally (URLs, JWT subject).
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Identity, String, func, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Identity, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ulid import ULID
 
@@ -30,6 +30,13 @@ class Family(Base):
     rid: Mapped[str] = mapped_column(String(26), unique=True, default=new_rid)
     name: Mapped[str] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Soft delete: set when the sole owner deletes their account; a scheduled job
+    # hard-purges the family (and all its data) once deleted_at is older than the
+    # retention window. See app.domains.account.service.
+    is_deleted: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("0"), default=False, nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     members: Mapped[list["User"]] = relationship(back_populates="family")
 
@@ -49,5 +56,12 @@ class User(Base):
         String(10), server_default=text("'member'"), default=UserRole.MEMBER.value
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Soft delete (Google Play account-deletion policy): set on self-deletion;
+    # login and token validation reject deleted users immediately. A scheduled
+    # job purges (families) or anonymises (members) once past the retention window.
+    is_deleted: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("0"), default=False, nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     family: Mapped["Family | None"] = relationship(back_populates="members")

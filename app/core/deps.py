@@ -31,7 +31,8 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
     if not rid:
         raise _CREDENTIALS_ERROR
     user = session.scalar(select(User).where(User.rid == rid))
-    if user is None:
+    # A soft-deleted account must not be usable even with a still-valid token.
+    if user is None or user.is_deleted:
         raise _CREDENTIALS_ERROR
     return user
 

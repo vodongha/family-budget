@@ -2,15 +2,21 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.deps import CurrentUser, SessionDep
-from app.domains.auth.schemas import RegisterRequest, Token, UserRead
+from app.domains.auth.schemas import (
+    RegisterRequest,
+    Token,
+    UpdateProfileRequest,
+    UserRead,
+)
 from app.domains.auth.service import (
     AuthService,
     EmailAlreadyRegisteredError,
     InvalidCredentialsError,
+    OwnerMustTransferError,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -53,3 +59,31 @@ def login(
 @router.get("/me", response_model=UserRead)
 def me(current_user: CurrentUser) -> UserRead:
     return UserRead.model_validate(current_user)
+
+
+@router.patch("/me", response_model=UserRead)
+def update_me(
+    payload: UpdateProfileRequest, current_user: CurrentUser, session: SessionDep
+) -> UserRead:
+    service = AuthService(session)
+    user = service.update_display_name(current_user, payload.display_name.strip())
+    return UserRead.model_validate(user)
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_me(current_user: CurrentUser, session: SessionDep) -> Response:
+    """Self-service account deletion (Google Play policy). Soft-deletes the
+    account immediately; data is purged by a scheduled job after the retention
+    window."""
+    service = AuthService(session)
+    try:
+        service.delete_account(current_user)
+    except OwnerMustTransferError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "You are the family owner. Transfer ownership to another member "
+                "before deleting your account."
+            ),
+        ) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

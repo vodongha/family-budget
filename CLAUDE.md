@@ -130,6 +130,28 @@ router → service → repository → SQLAlchemy → Oracle ADB
 the equivalent of a tenant key. Pass it into every service/repository call that reads or writes
 family-owned data. Treat a query without a `family_id` filter on tenant tables as a bug.
 
+### Account deletion & data retention (Google Play policy)
+
+Self-service deletion is **soft-delete + scheduled purge**, so the in-app and data-deletion
+requirements are both met:
+
+- `DELETE /auth/me` sets `users.is_deleted` + `deleted_at`. Login and `get_current_user`
+  reject deleted users immediately (401), even with an otherwise-valid token.
+- **Owner rule:** an owner with other active members is blocked (`409`) — ownership must move
+  first, so a family is never orphaned. A **sole** owner also soft-deletes the family.
+- **Purge job** (`app/domains/account/maintenance.py`, Celery Beat, daily): once `deleted_at`
+  is older than `RETENTION_DAYS` (30), a fully-deleted **family** is hard-purged with all its
+  data (transactions → wallets → invitations → members → family); a **member** soft-deleted
+  inside a still-active family is **anonymised** (PII scrubbed) rather than deleted, because
+  `transactions.created_by_user_id` is `NOT NULL` and references their row.
+- `PATCH /auth/me` updates the display name.
+
+### CORS
+
+`app/main.py` adds `CORSMiddleware`. The Flutter **web** client runs on a different origin and
+calls this API from the browser; auth is a Bearer token (no cookies), so `allow_origins=["*"]`
+is acceptable. Tighten to specific origins for production.
+
 ### Lazy database engine
 
 `app.core.database.get_engine()` builds the Oracle engine **on first use**, not at import time.
@@ -270,6 +292,11 @@ git commit --author="Claude Opus 4.8 <noreply@anthropic.com>" -m "..."
   absolute local wallet path; env vars beat `.env` in pydantic-settings.
 - **Thin mode uses `ewallet.pem` + wallet password**, not `cwallet.sso`. A missing/blank
   `WALLET_PASSWORD` means no connection.
+- **Oracle has no native boolean — filter with `== true()`/`== false()`, never `.is_(True/False)`.**
+  A `Boolean` column maps to `NUMBER(1)`; `.is_(False)` renders `... IS 0`, which Oracle rejects
+  with `ORA-00908: missing NULL keyword` (`IS` is only valid with `NULL`). SQLite accepts `IS 0`,
+  so the test suite passes while Oracle fails at runtime. Import `true, false` from `sqlalchemy`
+  and compare with `==` (renders `= 1` / `= 0`).
 
 ## Roadmap
 

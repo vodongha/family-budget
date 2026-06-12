@@ -1,6 +1,6 @@
 """DB access for auth — read/write only, no business logic."""
 
-from sqlalchemy import select
+from sqlalchemy import false, func, select
 from sqlalchemy.orm import Session
 
 from app.domains.users.models import Family, User, UserRole
@@ -11,7 +11,27 @@ class AuthRepository:
         self._session = session
 
     def get_user_by_email(self, email: str) -> User | None:
-        return self._session.scalar(select(User).where(User.email == email))
+        # Soft-deleted accounts are not authenticatable. Use ``== false()`` (not
+        # ``.is_(False)``): Oracle has no native boolean, and ``IS 0`` is invalid
+        # SQL there (ORA-00908) — ``= 0`` is what we need.
+        return self._session.scalar(
+            select(User).where(User.email == email, User.is_deleted == false())
+        )
+
+    def get_family(self, family_id: int) -> Family | None:
+        return self._session.get(Family, family_id)
+
+    def count_active_members(self, family_id: int, *, exclude_user_id: int) -> int:
+        """Active (non-deleted) members of a family, excluding one user."""
+        return self._session.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(
+                User.family_id == family_id,
+                User.is_deleted == false(),
+                User.id != exclude_user_id,
+            )
+        ) or 0
 
     def add_family(self, name: str) -> Family:
         family = Family(name=name)

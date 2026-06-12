@@ -72,3 +72,11 @@ def get_session() -> Generator[Session, None, None]:
         yield session
     finally:
         session.close()
+
+
+def new_session() -> Session:
+    """A standalone session for use outside the request cycle (e.g. Celery jobs).
+
+    The caller owns its lifecycle and must close it.
+    """
+    return _get_session_factory()()
