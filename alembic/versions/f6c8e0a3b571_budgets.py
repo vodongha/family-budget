@@ -4,7 +4,7 @@ Adds the budgets table — a monthly spending limit per category (family-level).
 One budget per (family, category).
 
 Revision ID: f6c8e0a3b571
-Revises: e5b7f9d2a468
+Revises: a1b2c3d4e5f6
 Create Date: 2026-06-13 14:00:00.000000
 
 """
@@ -15,7 +15,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'f6c8e0a3b571'
-down_revision: str | None = 'e5b7f9d2a468'
+down_revision: str | None = 'a1b2c3d4e5f6'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
