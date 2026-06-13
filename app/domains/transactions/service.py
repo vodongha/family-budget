@@ -13,6 +13,10 @@ from app.domains.wallets.repository import WalletRepository
 from app.domains.wallets.service import WalletNotFoundError
 
 
+class TransactionNotFoundError(Exception):
+    """Raised when a transaction rid is unknown or not visible to the caller."""
+
+
 class TransactionService:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -55,6 +59,16 @@ class TransactionService:
         self._session.commit()
         return transaction
 
+    def _resolve_category_id(
+        self, family_id: int, category_rid: str | None
+    ) -> int | None:
+        if category_rid is None:
+            return None
+        category = self._categories.get_by_rid(family_id, category_rid)
+        if category is None:
+            raise CategoryNotFoundError(category_rid)
+        return category.id
+
     def list(
         self,
         family_id: int,
@@ -62,13 +76,72 @@ class TransactionService:
         wallet_rid: str | None = None,
         scope: str = WalletScope.ALL.value,
         limit: int = 100,
+        type_: TransactionType | None = None,
+        category_rid: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> list[Transaction]:
+        category_id = self._resolve_category_id(family_id, category_rid)
+        type_value = type_.value if type_ is not None else None
+        filters = {
+            "limit": limit,
+            "type_": type_value,
+            "category_id": category_id,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
         # A specific wallet: it must be visible to the caller.
         if wallet_rid is not None:
             wallet = self._wallets.get_visible_by_rid(family_id, user_id, wallet_rid)
             if wallet is None:
                 raise WalletNotFoundError(wallet_rid)
-            return self._repo.list(family_id, wallet_id=wallet.id, limit=limit)
+            return self._repo.list(family_id, wallet_id=wallet.id, **filters)
         # Otherwise: only transactions in wallets the caller may see (per scope).
         ids = self._wallets.visible_wallet_ids(family_id, user_id, scope)
-        return self._repo.list(family_id, wallet_ids=ids, limit=limit)
+        return self._repo.list(family_id, wallet_ids=ids, **filters)
+
+    def update(
+        self,
+        family_id: int,
+        user_id: int,
+        rid: str,
+        wallet_rid: str,
+        type_: TransactionType,
+        amount: int,
+        note: str | None,
+        occurred_on: date | None,
+        category_rid: str | None = None,
+    ) -> Transaction:
+        transaction = self._repo.get_by_rid(family_id, rid)
+        # Must exist and live in a wallet the caller may see (privacy guard).
+        if transaction is None or (
+            self._wallets.get_visible_by_rid(
+                family_id, user_id, transaction.wallet.rid
+            )
+            is None
+        ):
+            raise TransactionNotFoundError(rid)
+        wallet = self._wallets.get_visible_by_rid(family_id, user_id, wallet_rid)
+        if wallet is None:
+            raise WalletNotFoundError(wallet_rid)
+        transaction.wallet_id = wallet.id
+        transaction.type = type_.value
+        transaction.amount = amount
+        transaction.note = note
+        transaction.occurred_on = occurred_on or date.today()
+        transaction.category_id = self._resolve_category_id(family_id, category_rid)
+        self._session.commit()
+        self._session.refresh(transaction)
+        return transaction
+
+    def delete(self, family_id: int, user_id: int, rid: str) -> None:
+        transaction = self._repo.get_by_rid(family_id, rid)
+        if transaction is None or (
+            self._wallets.get_visible_by_rid(
+                family_id, user_id, transaction.wallet.rid
+            )
+            is None
+        ):
+            raise TransactionNotFoundError(rid)
+        self._repo.delete(transaction)
+        self._session.commit()

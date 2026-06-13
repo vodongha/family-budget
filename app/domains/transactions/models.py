@@ -20,6 +20,11 @@ from app.domains.wallets.models import Wallet
 class TransactionType(enum.StrEnum):
     EXPENSE = "expense"
     INCOME = "income"
+    # The two legs of a wallet-to-wallet transfer. They move money between the
+    # family's own wallets, so they affect wallet balances but are excluded from
+    # income/expense totals and statistics.
+    TRANSFER_OUT = "transfer_out"  # leaves the source wallet
+    TRANSFER_IN = "transfer_in"  # enters the destination wallet
 
 
 class Transaction(Base):
@@ -40,6 +45,11 @@ class Transaction(Base):
     # Optional label; null = uncategorized (also after its category is deleted).
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id"), index=True, nullable=True
+    )
+    # Set on the two legs of a wallet-to-wallet transfer; both legs share this
+    # ULID so the pair can be read and deleted together. Null for normal txns.
+    transfer_group_rid: Mapped[str | None] = mapped_column(
+        String(26), index=True, nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

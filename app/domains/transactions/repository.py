@@ -26,6 +26,7 @@ class TransactionRepository:
         note: str | None,
         occurred_on: date,
         category_id: int | None = None,
+        transfer_group_rid: str | None = None,
     ) -> Transaction:
         transaction = Transaction(
             family_id=family_id,
@@ -36,10 +37,38 @@ class TransactionRepository:
             note=note,
             occurred_on=occurred_on,
             category_id=category_id,
+            transfer_group_rid=transfer_group_rid,
         )
         self._session.add(transaction)
         self._session.flush()
         return transaction
+
+    def list_by_transfer_group(
+        self, family_id: int, transfer_group_rid: str
+    ) -> list[Transaction]:
+        stmt = (
+            select(Transaction)
+            .where(
+                Transaction.family_id == family_id,
+                Transaction.transfer_group_rid == transfer_group_rid,
+            )
+            .options(selectinload(Transaction.wallet))
+        )
+        return list(self._session.scalars(stmt).all())
+
+    def get_by_rid(self, family_id: int, rid: str) -> Transaction | None:
+        stmt = (
+            select(Transaction)
+            .where(Transaction.family_id == family_id, Transaction.rid == rid)
+            .options(
+                selectinload(Transaction.wallet),
+                selectinload(Transaction.category),
+            )
+        )
+        return self._session.scalar(stmt)
+
+    def delete(self, transaction: Transaction) -> None:
+        self._session.delete(transaction)
 
     def list(
         self,
@@ -47,10 +76,15 @@ class TransactionRepository:
         wallet_id: int | None = None,
         wallet_ids: list[int] | None = None,
         limit: int = 100,
+        type_: str | None = None,
+        category_id: int | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> list[Transaction]:
         """Transactions for the family, newest first. When ``wallet_id`` is set,
         restricts to that wallet; otherwise, when ``wallet_ids`` is given,
-        restricts to that set (empty set → no rows)."""
+        restricts to that set (empty set → no rows). Optional ``type_``,
+        ``category_id`` and ``date_from``/``date_to`` filters narrow the result."""
         if wallet_ids is not None and not wallet_ids:
             return []
         stmt = (
@@ -67,6 +101,14 @@ class TransactionRepository:
             stmt = stmt.where(Transaction.wallet_id == wallet_id)
         elif wallet_ids is not None:
             stmt = stmt.where(Transaction.wallet_id.in_(wallet_ids))
+        if type_ is not None:
+            stmt = stmt.where(Transaction.type == type_)
+        if category_id is not None:
+            stmt = stmt.where(Transaction.category_id == category_id)
+        if date_from is not None:
+            stmt = stmt.where(Transaction.occurred_on >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(Transaction.occurred_on <= date_to)
         return list(self._session.scalars(stmt).all())
 
     def family_totals(

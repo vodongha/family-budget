@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.domains.auth.router import router as auth_router
+from app.domains.budgets.router import router as budgets_router
 from app.domains.categories.router import router as categories_router
 from app.domains.dashboard.router import router as dashboard_router
 from app.domains.families.router import router as families_router
@@ -12,6 +13,7 @@ from app.domains.health.router import router as health_router
 from app.domains.invitations.router import router as invitations_router
 from app.domains.stats.router import router as stats_router
 from app.domains.transactions.router import router as transactions_router
+from app.domains.transfers.router import router as transfers_router
 from app.domains.wallets.router import router as wallets_router
 
 app = FastAPI(
@@ -35,8 +37,10 @@ app.include_router(auth_router)
 app.include_router(families_router)
 app.include_router(invitations_router)
 app.include_router(categories_router)
+app.include_router(budgets_router)
 app.include_router(wallets_router)
 app.include_router(transactions_router)
+app.include_router(transfers_router)
 app.include_router(dashboard_router)
 app.include_router(stats_router)
 

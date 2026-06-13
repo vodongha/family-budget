@@ -16,9 +16,16 @@ from sqlalchemy.sql.elements import ColumnElement
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.wallets.models import Wallet, WalletScope, WalletVisibility
 
-# A signed-amount expression: +amount for income, -amount for expense.
+# A signed-amount expression for a wallet's balance: +amount for money coming in
+# (income or a transfer into this wallet), -amount for money going out (expense or
+# a transfer out of this wallet).
 _SIGNED_AMOUNT = case(
-    (Transaction.type == TransactionType.INCOME.value, Transaction.amount),
+    (
+        Transaction.type.in_(
+            [TransactionType.INCOME.value, TransactionType.TRANSFER_IN.value]
+        ),
+        Transaction.amount,
+    ),
     else_=-Transaction.amount,
 )
 
