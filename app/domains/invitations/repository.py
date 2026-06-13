@@ -15,7 +15,8 @@ class InvitationRepository:
     def add(
         self,
         family_id: int,
-        email: str,
+        email: str | None,
+        phone: str | None,
         role: UserRole,
         token: str,
         invited_by_user_id: int,
@@ -23,6 +24,7 @@ class InvitationRepository:
         invitation = Invitation(
             family_id=family_id,
             email=email,
+            phone=phone,
             role=role.value,
             token=token,
             status=InvitationStatus.PENDING.value,

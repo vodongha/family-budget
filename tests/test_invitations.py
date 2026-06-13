@@ -113,3 +113,56 @@ def test_owner_can_revoke_pending_invitation(
         json={"token": invite["token"], "password": "x", "display_name": "Mom"},
     )
     assert accept.status_code == 404
+
+
+def test_invite_requires_email_or_phone(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    resp = client.post("/invitations", json={}, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+def test_public_get_invitation_shows_family(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    invite = client.post(
+        "/invitations", json={"phone": "0900000000"}, headers=auth_headers
+    ).json()
+    assert invite["phone"] == "0900000000"
+    assert invite["email"] is None
+
+    public = client.get(f"/invitations/{invite['token']}")
+    assert public.status_code == 200
+    assert public.json()["family_name"] == "Vo Family"
+    assert public.json()["email"] is None
+
+
+def test_phone_invite_accept_requires_then_uses_email(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    token = client.post(
+        "/invitations", json={"phone": "0911111111"}, headers=auth_headers
+    ).json()["token"]
+
+    # Phone-only invite: accepting without an email is rejected.
+    missing = client.post(
+        "/invitations/accept",
+        json={"token": token, "password": "her-pass", "display_name": "Mom"},
+    )
+    assert missing.status_code == 422
+
+    # Supplying an email joins the family.
+    ok = client.post(
+        "/invitations/accept",
+        json={
+            "token": token,
+            "password": "her-pass",
+            "display_name": "Mom",
+            "email": "mom2@example.com",
+        },
+    )
+    assert ok.status_code == 200
+    headers = {"Authorization": f"Bearer {ok.json()['access_token']}"}
+    me = client.get("/auth/me", headers=headers).json()
+    assert me["email"] == "mom2@example.com"
+    assert me["role"] == "member"

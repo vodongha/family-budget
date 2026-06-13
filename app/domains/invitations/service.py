@@ -29,6 +29,10 @@ class DuplicateInvitationError(Exception):
     """Raised when a pending invitation for the same email already exists."""
 
 
+class MissingEmailError(Exception):
+    """Raised when accepting a phone-only invite without supplying an email."""
+
+
 class InvitationService:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -41,17 +45,37 @@ class InvitationService:
             raise NotOwnerError()
 
     def create(
-        self, current_user: User, family_id: int, email: str, role: UserRole
+        self,
+        current_user: User,
+        family_id: int,
+        email: str | None,
+        phone: str | None,
+        role: UserRole,
     ) -> Invitation:
         self._require_owner(current_user)
-        if self._auth.get_user_by_email(email) is not None:
-            raise EmailAlreadyRegisteredError(email)
-        if self._repo.pending_for_email(family_id, email) is not None:
-            raise DuplicateInvitationError(email)
+        if email is not None:
+            if self._auth.get_user_by_email(email) is not None:
+                raise EmailAlreadyRegisteredError(email)
+            if self._repo.pending_for_email(family_id, email) is not None:
+                raise DuplicateInvitationError(email)
         token = secrets.token_urlsafe(32)
-        invitation = self._repo.add(family_id, email, role, token, current_user.id)
+        invitation = self._repo.add(
+            family_id, email, phone, role, token, current_user.id
+        )
         self._session.commit()
         return invitation
+
+    def get_public(self, token: str) -> tuple[Invitation, str]:
+        """For the invite landing page: the invitation + its family name. Public."""
+        invitation = self._repo.get_by_token(token)
+        if (
+            invitation is None
+            or invitation.status != InvitationStatus.PENDING.value
+        ):
+            raise InvitationNotFoundError(token)
+        family = self._auth.get_family(invitation.family_id)
+        family_name = family.name if family is not None else ""
+        return invitation, family_name
 
     def list(self, current_user: User, family_id: int) -> list[Invitation]:
         self._require_owner(current_user)
@@ -69,17 +93,21 @@ class InvitationService:
         return invitation
 
     def accept(
-        self, token: str, password: str, display_name: str
+        self, token: str, password: str, display_name: str, email: str | None = None
     ) -> tuple[User, str]:
         """Accept an invitation: create the invitee's user in the family, return
-        the user and a fresh JWT (auto-login)."""
+        the user and a fresh JWT (auto-login). For phone-only invites the invitee
+        supplies their own email."""
         invitation = self._repo.get_by_token(token)
         if invitation is None or invitation.status != InvitationStatus.PENDING.value:
             raise InvitationNotFoundError(token)
-        if self._auth.get_user_by_email(invitation.email) is not None:
-            raise EmailAlreadyRegisteredError(invitation.email)
+        final_email = invitation.email or email
+        if not final_email:
+            raise MissingEmailError()
+        if self._auth.get_user_by_email(final_email) is not None:
+            raise EmailAlreadyRegisteredError(final_email)
         user = self._auth.add_user(
-            email=invitation.email,
+            email=final_email,
             hashed_password=hash_password(password),
             display_name=display_name,
             family_id=invitation.family_id,

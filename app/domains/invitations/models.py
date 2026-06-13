@@ -27,7 +27,10 @@ class Invitation(Base):
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     rid: Mapped[str] = mapped_column(String(26), unique=True, default=new_rid)
     family_id: Mapped[int] = mapped_column(ForeignKey("families.id"), index=True)
-    email: Mapped[str] = mapped_column(String(255), index=True)
+    # At least one contact is set. email may be empty for phone-only invites
+    # (the invitee supplies their email when accepting).
+    email: Mapped[str | None] = mapped_column(String(255), index=True, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     role: Mapped[str] = mapped_column(String(10))  # UserRole value to grant
     token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     status: Mapped[str] = mapped_column(String(10))  # InvitationStatus value

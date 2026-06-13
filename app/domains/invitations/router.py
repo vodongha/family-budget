@@ -9,6 +9,7 @@ from app.domains.auth.service import EmailAlreadyRegisteredError
 from app.domains.invitations.schemas import (
     AcceptInvitation,
     InvitationCreate,
+    InvitationPublic,
     InvitationRead,
 )
 from app.domains.invitations.service import (
@@ -16,6 +17,7 @@ from app.domains.invitations.service import (
     InvitationNotFoundError,
     InvitationNotPendingError,
     InvitationService,
+    MissingEmailError,
     NotOwnerError,
 )
 
@@ -35,7 +37,7 @@ def create_invitation(
 ) -> InvitationRead:
     try:
         invitation = InvitationService(session).create(
-            current_user, family_id, payload.email, payload.role
+            current_user, family_id, payload.email, payload.phone, payload.role
         )
     except NotOwnerError:
         raise _NOT_OWNER from None
@@ -62,16 +64,40 @@ def list_invitations(
     return [InvitationRead.model_validate(i) for i in invitations]
 
 
+@router.get("/{token}", response_model=InvitationPublic)
+def get_invitation(token: str, session: SessionDep) -> InvitationPublic:
+    """Public: the invite landing page reads this to show the family + whether an
+    email is still needed. No auth (the invitee has no account yet)."""
+    try:
+        invitation, family_name = InvitationService(session).get_public(token)
+    except InvitationNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invitation not found or not pending",
+        ) from None
+    return InvitationPublic(
+        family_name=family_name,
+        role=invitation.role,
+        status=invitation.status,
+        email=invitation.email,
+    )
+
+
 @router.post("/accept", response_model=Token)
 def accept_invitation(payload: AcceptInvitation, session: SessionDep) -> Token:
     try:
         _user, jwt = InvitationService(session).accept(
-            payload.token, payload.password, payload.display_name
+            payload.token, payload.password, payload.display_name, payload.email
         )
     except InvitationNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Invitation not found or not pending",
+        ) from None
+    except MissingEmailError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="An email is required to accept this invitation",
         ) from None
     except EmailAlreadyRegisteredError:
         raise HTTPException(
