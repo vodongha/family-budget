@@ -1,10 +1,17 @@
-"""Invitation business logic — stateless. Owner-only management; public accept."""
+"""Invitation business logic — stateless. Owner-only management; public accept
+for new accounts, in-app accept for existing ones."""
+
+# The service has a method named ``list`` (shadows the builtin in the class body);
+# deferring annotation evaluation keeps ``list[...]`` hints valid.
+from __future__ import annotations
 
 import secrets
+from datetime import UTC, datetime
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.phone import try_normalize_phone
 from app.core.security import create_access_token, hash_password
 from app.domains.auth.repository import AuthRepository
 from app.domains.auth.service import EmailAlreadyRegisteredError
@@ -26,11 +33,19 @@ class InvitationNotPendingError(Exception):
 
 
 class DuplicateInvitationError(Exception):
-    """Raised when a pending invitation for the same email already exists."""
+    """Raised when a pending invitation for the same recipient already exists."""
 
 
 class MissingEmailError(Exception):
     """Raised when accepting a phone-only invite without supplying an email."""
+
+
+class AlreadyMemberError(Exception):
+    """Raised when the invited account already belongs to this family."""
+
+
+class MustTransferOwnershipFirstError(Exception):
+    """An owner with other members must transfer ownership before leaving."""
 
 
 class InvitationService:
@@ -44,6 +59,24 @@ class InvitationService:
         if current_user.role != UserRole.OWNER.value:
             raise NotOwnerError()
 
+    def _find_existing_target(
+        self, family_id: int, email: str | None, phone: str | None
+    ) -> User | None:
+        """Match the invited contact to an existing account, if any.
+
+        Raises [AlreadyMemberError] when the match is already in this family.
+        """
+        user = self._auth.get_user_by_email(email) if email is not None else None
+        if user is None and phone:
+            normalized = try_normalize_phone(phone)
+            if normalized is not None:
+                user = self._auth.get_user_by_phone(normalized)
+        if user is None:
+            return None
+        if user.family_id == family_id:
+            raise AlreadyMemberError(user.rid)
+        return user
+
     def create(
         self,
         current_user: User,
@@ -53,11 +86,21 @@ class InvitationService:
         role: UserRole,
     ) -> Invitation:
         self._require_owner(current_user)
-        if email is not None:
-            if self._auth.get_user_by_email(email) is not None:
-                raise EmailAlreadyRegisteredError(email)
-            if self._repo.pending_for_email(family_id, email) is not None:
-                raise DuplicateInvitationError(email)
+        target = self._find_existing_target(family_id, email, phone)
+        if target is not None:
+            # Existing account → in-app invite, no link.
+            if self._repo.pending_for_target(family_id, target.id) is not None:
+                raise DuplicateInvitationError(target.rid)
+            token = secrets.token_urlsafe(32)
+            invitation = self._repo.add(
+                family_id, email, phone, role, token, current_user.id,
+                target_user_id=target.id,
+            )
+            self._session.commit()
+            return invitation
+        # New account → shareable registration link.
+        if email is not None and self._repo.pending_for_email(family_id, email):
+            raise DuplicateInvitationError(email)
         token = secrets.token_urlsafe(32)
         invitation = self._repo.add(
             family_id, email, phone, role, token, current_user.id
@@ -95,7 +138,7 @@ class InvitationService:
     def accept(
         self, token: str, password: str, display_name: str, email: str | None = None
     ) -> tuple[User, str]:
-        """Accept an invitation: create the invitee's user in the family, return
+        """Accept a link invitation: create the invitee's user in the family, return
         the user and a fresh JWT (auto-login). For phone-only invites the invitee
         supplies their own email."""
         invitation = self._repo.get_by_token(token)
@@ -118,3 +161,60 @@ class InvitationService:
         self._session.commit()
         jwt = create_access_token(subject=user.rid, extra={"family_id": user.family_id})
         return user, jwt
+
+    def inbox(self, user: User) -> list[tuple[Invitation, str, str]]:
+        """Pending in-app invites for ``user`` as (invitation, family_name, inviter)."""
+        items: list[tuple[Invitation, str, str]] = []
+        for inv in self._repo.list_inbox(user.id):
+            family = self._auth.get_family(inv.family_id)
+            inviter = self._session.get(User, inv.invited_by_user_id)
+            items.append(
+                (
+                    inv,
+                    family.name if family is not None else "",
+                    inviter.display_name if inviter is not None else "",
+                )
+            )
+        return items
+
+    def accept_existing(self, user: User, rid: str) -> tuple[User, str]:
+        """Accept an in-app invite: move ``user`` into the inviting family. Their
+        previous family is soft-deleted if they were its only member; an owner with
+        other members must transfer ownership first. Returns the user + a fresh JWT
+        (the new family scope)."""
+        invitation = self._repo.get_pending_for_target(user.id, rid)
+        if invitation is None:
+            raise InvitationNotFoundError(rid)
+
+        old_family_id = user.family_id
+        others = (
+            self._auth.count_active_members(old_family_id, exclude_user_id=user.id)
+            if old_family_id is not None
+            else 0
+        )
+        if user.role == UserRole.OWNER.value and old_family_id is not None and others > 0:
+            raise MustTransferOwnershipFirstError()
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        user.family_id = invitation.family_id
+        user.role = invitation.role
+        # If they were the last active member of their old family, tear it down.
+        if old_family_id is not None and others == 0:
+            old_family = self._auth.get_family(old_family_id)
+            if old_family is not None and not old_family.is_deleted:
+                old_family.is_deleted = True
+                old_family.deleted_at = now
+        invitation.status = InvitationStatus.ACCEPTED.value
+        invitation.accepted_at = now
+        self._session.commit()
+        self._session.refresh(user)
+        jwt = create_access_token(subject=user.rid, extra={"family_id": user.family_id})
+        return user, jwt
+
+    def decline(self, user: User, rid: str) -> Invitation:
+        invitation = self._repo.get_pending_for_target(user.id, rid)
+        if invitation is None:
+            raise InvitationNotFoundError(rid)
+        invitation.status = InvitationStatus.DECLINED.value
+        self._session.commit()
+        return invitation

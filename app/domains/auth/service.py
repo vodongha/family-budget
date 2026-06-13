@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.google import verify_google_id_token
+from app.core.phone import PhoneValidationError, normalize_phone
 from app.core.security import create_access_token, hash_password, verify_password
 from app.domains.auth.repository import AuthRepository
 from app.domains.users.models import User, UserRole
@@ -19,6 +20,14 @@ class InvalidCredentialsError(Exception):
     pass
 
 
+class InvalidPhoneError(Exception):
+    """The supplied phone number is not a valid, parseable number."""
+
+
+class PhoneAlreadyInUseError(Exception):
+    """The phone number is already attached to another account."""
+
+
 class OwnerMustTransferError(Exception):
     """An owner with other active members cannot delete until ownership moves."""
 
@@ -28,11 +37,33 @@ class AuthService:
         self._session = session
         self._repo = AuthRepository(session)
 
+    def _resolve_phone(self, raw: str | None, *, exclude_user_id: int | None) -> str | None:
+        """Validate+normalise an optional phone and ensure it's not taken.
+
+        Returns the E.164 form, or ``None`` when no number was supplied.
+        """
+        if raw is None or not raw.strip():
+            return None
+        try:
+            phone = normalize_phone(raw)
+        except PhoneValidationError:
+            raise InvalidPhoneError(raw) from None
+        existing = self._repo.get_user_by_phone(phone)
+        if existing is not None and existing.id != exclude_user_id:
+            raise PhoneAlreadyInUseError(phone)
+        return phone
+
     def register(
-        self, email: str, password: str, display_name: str, family_name: str
+        self,
+        email: str,
+        password: str,
+        display_name: str,
+        family_name: str,
+        phone: str | None = None,
     ) -> User:
         if self._repo.get_user_by_email(email) is not None:
             raise EmailAlreadyRegisteredError(email)
+        normalized_phone = self._resolve_phone(phone, exclude_user_id=None)
         family = self._repo.add_family(family_name)
         # The person who creates the family owns it.
         user = self._repo.add_user(
@@ -41,6 +72,7 @@ class AuthService:
             display_name=display_name,
             family_id=family.id,
             role=UserRole.OWNER,
+            phone=normalized_phone,
         )
         self._session.commit()
         return user
@@ -99,8 +131,12 @@ class AuthService:
             subject=user.rid, extra={"family_id": user.family_id}
         )
 
-    def update_display_name(self, user: User, display_name: str) -> User:
+    def update_profile(
+        self, user: User, display_name: str, phone: str | None
+    ) -> User:
+        """Update the display name and (optional) phone. A blank phone clears it."""
         user.display_name = display_name
+        user.phone = self._resolve_phone(phone, exclude_user_id=user.id)
         self._session.commit()
         self._session.refresh(user)
         return user

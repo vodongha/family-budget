@@ -54,6 +54,12 @@ class User(Base):
         String(255), unique=True, index=True, nullable=True
     )
     display_name: Mapped[str] = mapped_column(String(120))
+    # Optional contact number, stored canonically in E.164 (e.g. +84912345678).
+    # Unique when present (nullable columns allow many NULLs), so it can be used
+    # to invite an existing account into a family.
+    phone: Mapped[str | None] = mapped_column(
+        String(32), unique=True, index=True, nullable=True
+    )
     family_id: Mapped[int | None] = mapped_column(ForeignKey("families.id"))
     # Stores a UserRole value. server_default keeps pre-existing rows valid after
     # the column was added; the register flow sets OWNER for a family's creator.
