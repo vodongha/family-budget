@@ -19,6 +19,7 @@ class InvitationStatus(enum.StrEnum):
     PENDING = "pending"
     ACCEPTED = "accepted"
     REVOKED = "revoked"
+    DECLINED = "declined"
 
 
 class Invitation(Base):
@@ -35,5 +36,15 @@ class Invitation(Base):
     token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     status: Mapped[str] = mapped_column(String(10))  # InvitationStatus value
     invited_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # Set when the contact matches an existing account: the invite is delivered
+    # in-app to this user and accepted in one tap (no link/registration).
+    target_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    @property
+    def in_app(self) -> bool:
+        """True when this invite targets an existing account (no link needed)."""
+        return self.target_user_id is not None

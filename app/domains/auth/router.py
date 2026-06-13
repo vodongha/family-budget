@@ -18,10 +18,21 @@ from app.domains.auth.service import (
     AuthService,
     EmailAlreadyRegisteredError,
     InvalidCredentialsError,
+    InvalidPhoneError,
     OwnerMustTransferError,
+    PhoneAlreadyInUseError,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+_INVALID_PHONE = HTTPException(
+    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+    detail="Invalid phone number",
+)
+_PHONE_TAKEN = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail="Phone number already in use",
+)
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -33,11 +44,16 @@ def register(payload: RegisterRequest, session: SessionDep) -> UserRead:
             password=payload.password,
             display_name=payload.display_name,
             family_name=payload.family_name,
+            phone=payload.phone,
         )
     except EmailAlreadyRegisteredError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
         ) from None
+    except InvalidPhoneError:
+        raise _INVALID_PHONE from None
+    except PhoneAlreadyInUseError:
+        raise _PHONE_TAKEN from None
     return UserRead.model_validate(user)
 
 
@@ -83,7 +99,14 @@ def update_me(
     payload: UpdateProfileRequest, current_user: CurrentUser, session: SessionDep
 ) -> UserRead:
     service = AuthService(session)
-    user = service.update_display_name(current_user, payload.display_name.strip())
+    try:
+        user = service.update_profile(
+            current_user, payload.display_name.strip(), payload.phone
+        )
+    except InvalidPhoneError:
+        raise _INVALID_PHONE from None
+    except PhoneAlreadyInUseError:
+        raise _PHONE_TAKEN from None
     return UserRead.model_validate(user)
 
 

@@ -30,6 +30,18 @@ class InvitationRead(BaseModel):
     status: InvitationStatus
     # The accept token — shown to the owner so they can pass the invite link along.
     token: str
+    # True when the invite targets an existing account (delivered in-app, no link).
+    in_app: bool
+    created_at: datetime
+
+
+class InvitationInboxRead(BaseModel):
+    """A pending in-app invite shown to the invited (existing) account."""
+
+    rid: str
+    family_name: str
+    invited_by: str
+    role: UserRole
     created_at: datetime
 
 

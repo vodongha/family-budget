@@ -16,14 +16,19 @@ income/expense together, scoped per family.
 
 ### Backend (Phase 1 + 2 — done)
 
-- **Auth** — register (creates a family + owner), login (JWT), `GET /auth/me`
+- **Auth** — register (creates a family + owner), login (JWT), `GET /auth/me`; optional
+  **phone** (E.164, validated with `phonenumbers`, unique)
 - **Sign in with Google** — `POST /auth/google` verifies a Google ID token, links it to
   an existing email or creates a new family; Google is unlinked on account deletion
-- **Roles** — `owner` / `member`; the person who creates a family owns it
-- **Invitations** — owner invites by **email or phone**; a public invite link lets the
-  invitee accept with a chosen password (auto-login); owner can revoke pending invites
+- **Roles & members** — `owner` / `member`; the family creator owns it. `GET /members`
+  lists the family; `POST /families/transfer-ownership` hands ownership to another member
+  (single-owner — the old owner becomes a member)
+- **Invitations** — owner invites by **email or phone**. A new contact gets a public invite
+  link (accept with a chosen password → auto-login). A contact that **already has an account**
+  gets an **in-app invite** (`GET /invitations/inbox` → `POST /invitations/{rid}/accept-existing`
+  / `decline`) and is moved into the family in one tap, with consent — no link. Owner can revoke
 - **Statistics** — `GET /stats/monthly`: per-month income/expense totals for charts
-- **Profile & account deletion** — `PATCH /auth/me` (display name); `DELETE /auth/me`
+- **Profile & account deletion** — `PATCH /auth/me` (display name + phone); `DELETE /auth/me`
   self-service deletion (Google Play policy): soft-delete now + scheduled 30-day purge.
   Owners must transfer ownership before deleting (sole owners tear down the whole family)
 - **Wallets** — create / list / get; balance is **derived** from transactions, never stored
