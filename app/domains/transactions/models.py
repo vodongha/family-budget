@@ -12,6 +12,7 @@ from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Identity, String,
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.domains.categories.models import Category
 from app.domains.users.models import new_rid
 from app.domains.wallets.models import Wallet
 
@@ -36,6 +37,11 @@ class Transaction(Base):
     amount: Mapped[int] = mapped_column(BigInteger)
     note: Mapped[str | None] = mapped_column(String(500))
     occurred_on: Mapped[date] = mapped_column(Date)
+    # Optional label; null = uncategorized (also after its category is deleted).
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id"), index=True, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     wallet: Mapped[Wallet] = relationship()
+    category: Mapped[Category | None] = relationship()

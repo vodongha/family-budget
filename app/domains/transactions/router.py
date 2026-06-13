@@ -3,6 +3,8 @@
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentFamily, CurrentUser, SessionDep
+from app.domains.categories.schemas import CategoryRead
+from app.domains.categories.service import CategoryNotFoundError
 from app.domains.transactions.models import Transaction
 from app.domains.transactions.schemas import TransactionCreate, TransactionRead
 from app.domains.transactions.service import TransactionService
@@ -19,6 +21,11 @@ def _to_read(transaction: Transaction) -> TransactionRead:
         amount=transaction.amount,
         note=transaction.note,
         occurred_on=transaction.occurred_on,
+        category=(
+            CategoryRead.model_validate(transaction.category)
+            if transaction.category is not None
+            else None
+        ),
         created_at=transaction.created_at,
     )
 
@@ -39,10 +46,15 @@ def create_transaction(
             amount=payload.amount,
             note=payload.note,
             occurred_on=payload.occurred_on,
+            category_rid=payload.category_rid,
         )
     except WalletNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
+        ) from None
+    except CategoryNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
         ) from None
     return _to_read(transaction)
 
