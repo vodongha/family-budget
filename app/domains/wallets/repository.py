@@ -1,6 +1,6 @@
 """DB access for wallets. Always scoped by family_id (tenant boundary)."""
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.domains.transactions.models import Transaction, TransactionType
@@ -50,3 +50,28 @@ class WalletRepository:
             Transaction.wallet_id == wallet_id,
         )
         return int(self._session.scalar(stmt) or 0)
+
+    def counts_by_wallet(self, family_id: int) -> dict[int, int]:
+        """Transaction count per wallet_id (absent → 0)."""
+        stmt = (
+            select(Transaction.wallet_id, func.count())
+            .where(Transaction.family_id == family_id)
+            .group_by(Transaction.wallet_id)
+        )
+        return {wallet_id: int(n) for wallet_id, n in self._session.execute(stmt)}
+
+    def delete_with_transactions(self, family_id: int, wallet_id: int) -> int:
+        """Delete the wallet's transactions then the wallet. Returns the number of
+        transactions removed. Caller commits."""
+        deleted = self._session.execute(
+            delete(Transaction).where(
+                Transaction.family_id == family_id,
+                Transaction.wallet_id == wallet_id,
+            )
+        ).rowcount
+        self._session.execute(
+            delete(Wallet).where(
+                Wallet.family_id == family_id, Wallet.id == wallet_id
+            )
+        )
+        return int(deleted or 0)

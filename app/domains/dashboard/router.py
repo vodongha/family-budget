@@ -23,8 +23,9 @@ def summary(session: SessionDep, family_id: CurrentFamily) -> DashboardSummary:
                 rid=wallet.rid,
                 name=wallet.name,
                 balance=balance,
+                txn_count=count,
                 created_at=wallet.created_at,
             )
-            for wallet, balance in wallets
+            for wallet, balance, count in wallets
         ],
     )
