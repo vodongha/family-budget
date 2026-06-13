@@ -27,21 +27,27 @@ income/expense together, scoped per family.
   link (accept with a chosen password → auto-login). A contact that **already has an account**
   gets an **in-app invite** (`GET /invitations/inbox` → `POST /invitations/{rid}/accept-existing`
   / `decline`) and is moved into the family in one tap, with consent — no link. Owner can revoke
-- **Statistics** — `GET /stats/monthly`: per-month income/expense totals for charts
+- **Statistics** — `GET /stats/monthly` (per-month income/expense) + `GET /stats/by-category`
+  (totals per category); both scope-aware (personal / family)
 - **Profile & account deletion** — `PATCH /auth/me` (display name + phone); `DELETE /auth/me`
   self-service deletion (Google Play policy): soft-delete now + scheduled 30-day purge.
   Owners must transfer ownership before deleting (sole owners tear down the whole family)
-- **Wallets** — create / list / get; balance is **derived** from transactions, never stored
-- **Transactions** — expense / income; positive integer amounts in đồng; family-scoped
+- **Wallets** — **family** (shared) or **personal** (private to creator); create / list / get /
+  **delete** (cascades its transactions); balance is **derived**, never stored. `?scope=` filters
+- **Categories** — family-scoped income/expense labels (emoji + colour) for tagging transactions
+- **Transactions** — expense / income; positive integer đồng; optional category; family-scoped.
+  Create / list (filter by `type`, `category_rid`, `date_from/to`) / **edit** / **delete**
+- **Budgets** — per-category **monthly limit** with current-month spend (`GET/POST/PATCH/DELETE /budgets`)
+- **Transfers** — move money between wallets via linked `transfer_in`/`transfer_out` legs
+  (`POST /transfers`, `DELETE /transfers/{group_rid}`); excluded from income/expense totals
 - **Dashboard** — `GET /dashboard/summary`: total income / expense / net + per-wallet balances
 - **Multi-tenant isolation** — every query is scoped by `family_id`; one family cannot see another's data
 - **Health** — `GET /health` runs `SELECT 1 FROM dual` to verify the ADB connection
 
 ### Planned
 
-Categories · multiple wallets + transfers · reports · budgets & alerts · recurring
-transactions · receipt OCR · auto-categorize (merchant dictionary + Ollama). See the
-roadmap in [CLAUDE.md](CLAUDE.md).
+Per-member spending reports · budget alerts · recurring transactions · receipt OCR ·
+auto-categorize (merchant dictionary + Ollama). See the roadmap in [CLAUDE.md](CLAUDE.md).
 
 ---
 

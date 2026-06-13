@@ -53,7 +53,10 @@ This app moves real household money. These rules are not style preferences.
 - **Every scoped query filters by `family_id`.** This is the tenant boundary. Repositories always
   receive `family_id` explicitly; services never hold it as state. Enforced via the
   `get_current_family` FastAPI dependency (see Architecture).
-- **`transfer` (wallet-to-wallet) is deferred to v1.1.** MVP is expense/income only.
+- **Transfers** are two linked transaction legs (`transfer_out` from source, `transfer_in` to
+  destination) sharing a `transfer_group_rid`. They affect wallet balances but are **excluded**
+  from income/expense totals and statistics (the signed-amount expression and the stats buckets
+  treat them specially). Don't reintroduce them into income/expense aggregation.
 - If you touch balance computation, transaction writes, or the `family_id` scope, **write a test**
   before you change behaviour. A wrong write at family scale is worse than a slow feature.
 
@@ -105,10 +108,12 @@ family-budget/
 └── wallet/                      # ADB wallet — GITIGNORED, never commit
 ```
 
-### Planned domains (not yet built)
+### Domains
 
-`wallets`, `categories`, `transactions`, `budgets`, `reports`, `ocr`, `ai`. Each follows the same
-`router / service / repository / schemas / models (/ tasks for Celery)` layout.
+Built: `users`, `auth`, `families`, `invitations`, `categories`, `wallets`, `transactions`,
+`transfers`, `budgets`, `dashboard`, `stats`, `account`, `health`. Planned: `reports`, `ocr`,
+`ai`. Each follows the same `router / service / repository / schemas / models (/ tasks for
+Celery)` layout.
 
 ## Architecture & conventions
 
@@ -207,6 +212,26 @@ wallet only by the family owner (`403` otherwise). New wallets default to family
 sorted by amount descending; uncategorized transactions fold into one bucket (`category_rid`
 null, `default_key` `"uncategorized"`). Aggregation is done **in Python** (not a SQL `GROUP BY`
 with date functions) so the query stays portable across Oracle and the SQLite test database.
+
+### Transactions: edit / delete / filter
+
+Beyond create + list, `PATCH /transactions/{rid}` (full update) and `DELETE /transactions/{rid}`
+operate only on transactions whose wallet is visible to the caller (same privacy guard). `GET
+/transactions` accepts `type`, `category_rid`, `date_from`, `date_to` filters on top of
+`wallet_rid`/`scope`/`limit`.
+
+### Budgets (`app/domains/budgets/`)
+
+A budget is a **monthly spending limit per category**, family-level (one per category, unique
+`(family_id, category_id)`). `GET /budgets` returns each budget with its current-month `spent`
+(summed over **family** wallets so personal spending stays private), derived — never stored.
+`POST` (`409` on duplicate), `PATCH {amount}`, `DELETE`.
+
+### Transfers (`app/domains/transfers/`)
+
+`POST /transfers {from_wallet_rid, to_wallet_rid, amount, ...}` creates the two linked legs (both
+wallets must be visible to the caller; same wallet → `400`). `DELETE /transfers/{group_rid}`
+removes both. See the money-rules note on why transfers stay out of income/expense totals.
 
 ### Lazy database engine
 
@@ -323,12 +348,11 @@ git config --local user.name "vodongha"
 git config --local user.email "vodongha@hotmail.com"
 ```
 
-AI-assisted commits are **authored by Claude**, with the personal identity as committer (so the
-push still goes through the `vodongha` account). Use the actual model in the author name:
+AI-assisted commits are **authored by `vodongha`** with **Claude as the committer**:
 
 ```bash
-git commit --author="Claude Opus 4.8 <noreply@anthropic.com>" -m "..."
-# committer stays vodongha <vodongha@hotmail.com> (from local config)
+GIT_COMMITTER_NAME="Claude Opus 4.8" GIT_COMMITTER_EMAIL="noreply@anthropic.com" \
+  git commit --author="vodongha <vodongha@hotmail.com>" -m "..."
 ```
 
 ## Gotchas (learned the hard way — read before debugging these)
