@@ -145,7 +145,9 @@ requirements are both met:
   is older than `RETENTION_DAYS` (30), a fully-deleted **family** is hard-purged with all its
   data (transactions → wallets → invitations → members → family); a **member** soft-deleted
   inside a still-active family is **anonymised** (PII scrubbed) rather than deleted, because
-  `transactions.created_by_user_id` is `NOT NULL` and references their row.
+  `transactions.created_by_user_id` is `NOT NULL` and references their row. The
+  anonymised member's **personal** wallets (and their transactions) are purged
+  too — private data no one else can see; shared family data stays.
 - `PATCH /auth/me` updates the display name and optional **phone** (E.164, validated with
   `phonenumbers` in `app/core/phone.py`, unique; blank clears it).
 
@@ -180,11 +182,31 @@ creates a new family + owner. Google-only accounts have an **empty password hash
 password-login; deleting an account clears `google_sub` (unlink). Set `GOOGLE_CLIENT_ID` in
 the environment to enable it.
 
+### Wallet privacy (personal vs family)
+
+A wallet is either **family** (shared — every member sees it, its transactions,
+balance, and totals) or **personal** (private — only its `owner_user_id` can see
+it). `wallets.visibility` + `wallets.owner_user_id` carry this. The rule lives in
+`WalletRepository.visibility_clause` and **every** wallet read goes through it, so
+a member can never see (or write into) another member's personal wallet — not even
+the family owner. `get_visible_by_rid` returns `None` for a wallet the caller may
+not see (404, no existence leak).
+
+Reads accept a `scope` query param (`WalletScope`): `all` (default — family +
+caller's own personal), `family`, or `personal`. It threads through
+`GET /wallets`, `GET /dashboard/summary`, `GET /transactions`, and both `/stats`
+endpoints — each constrains its transaction/balance aggregation to the caller's
+visible wallet ids. **Delete:** a personal wallet by its owner; a shared family
+wallet only by the family owner (`403` otherwise). New wallets default to family;
+`POST /wallets {visibility: "personal"}` makes a private one (owner = creator).
+
 ### Statistics
 
 `GET /stats/monthly?months=N` (`app/domains/stats/`) returns per-month income/expense totals.
-Aggregation is done **in Python** (not a SQL `GROUP BY` with date functions) so the query
-stays portable across Oracle and the SQLite test database.
+`GET /stats/by-category?kind=expense|income&months=N` returns per-category totals for one kind,
+sorted by amount descending; uncategorized transactions fold into one bucket (`category_rid`
+null, `default_key` `"uncategorized"`). Aggregation is done **in Python** (not a SQL `GROUP BY`
+with date functions) so the query stays portable across Oracle and the SQLite test database.
 
 ### Lazy database engine
 

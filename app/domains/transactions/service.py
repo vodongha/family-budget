@@ -8,6 +8,7 @@ from app.domains.categories.repository import CategoryRepository
 from app.domains.categories.service import CategoryNotFoundError
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.repository import TransactionRepository
+from app.domains.wallets.models import WalletScope
 from app.domains.wallets.repository import WalletRepository
 from app.domains.wallets.service import WalletNotFoundError
 
@@ -30,8 +31,9 @@ class TransactionService:
         occurred_on: date | None,
         category_rid: str | None = None,
     ) -> Transaction:
-        # The wallet must belong to this family — this is the tenant guard.
-        wallet = self._wallets.get_by_rid(family_id, wallet_rid)
+        # The wallet must be visible to this caller — tenant + privacy guard.
+        # (A member can't write into another member's personal wallet.)
+        wallet = self._wallets.get_visible_by_rid(family_id, user_id, wallet_rid)
         if wallet is None:
             raise WalletNotFoundError(wallet_rid)
         category_id: int | None = None
@@ -54,12 +56,19 @@ class TransactionService:
         return transaction
 
     def list(
-        self, family_id: int, wallet_rid: str | None = None, limit: int = 100
+        self,
+        family_id: int,
+        user_id: int,
+        wallet_rid: str | None = None,
+        scope: str = WalletScope.ALL.value,
+        limit: int = 100,
     ) -> list[Transaction]:
-        wallet_id: int | None = None
+        # A specific wallet: it must be visible to the caller.
         if wallet_rid is not None:
-            wallet = self._wallets.get_by_rid(family_id, wallet_rid)
+            wallet = self._wallets.get_visible_by_rid(family_id, user_id, wallet_rid)
             if wallet is None:
                 raise WalletNotFoundError(wallet_rid)
-            wallet_id = wallet.id
-        return self._repo.list(family_id, wallet_id, limit)
+            return self._repo.list(family_id, wallet_id=wallet.id, limit=limit)
+        # Otherwise: only transactions in wallets the caller may see (per scope).
+        ids = self._wallets.visible_wallet_ids(family_id, user_id, scope)
+        return self._repo.list(family_id, wallet_ids=ids, limit=limit)
