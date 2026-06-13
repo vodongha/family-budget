@@ -13,8 +13,8 @@ class DashboardService:
         self._wallets = WalletService(session)
         self._transactions = TransactionRepository(session)
 
-    def summary(self, family_id: int) -> tuple[int, int, list[tuple[Wallet, int]]]:
-        """Return (total_income, total_expense, [(wallet, balance), ...])."""
+    def summary(self, family_id: int) -> tuple[int, int, list[tuple[Wallet, int, int]]]:
+        """Return (total_income, total_expense, [(wallet, balance, txn_count), ...])."""
         total_income, total_expense = self._transactions.family_totals(family_id)
         wallets = self._wallets.list_with_balances(family_id)
         return total_income, total_expense, wallets

@@ -9,6 +9,10 @@ class WalletCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
 
 
+class WalletDeleteResult(BaseModel):
+    deleted_transactions: int
+
+
 class WalletRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -16,4 +20,7 @@ class WalletRead(BaseModel):
     name: str
     # Derived balance in integer minor units (đồng). Can be negative.
     balance: int
+    # Number of transactions in this wallet (shown before a delete). Defaults to
+    # 0 for callers that don't compute it (e.g. the dashboard summary).
+    txn_count: int = 0
     created_at: datetime
