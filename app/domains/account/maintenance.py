@@ -70,6 +70,23 @@ def purge_expired_accounts(
         )
     )
     for user in members:
+        # Their personal wallets are private data no one else can see — purge
+        # them (and their transactions) rather than leave them orphaned. Shared
+        # family wallets/transactions stay; the member row is only anonymised.
+        personal_wallet_ids = list(
+            session.scalars(
+                select(Wallet.id).where(Wallet.owner_user_id == user.id)
+            )
+        )
+        if personal_wallet_ids:
+            session.execute(
+                delete(Transaction).where(
+                    Transaction.wallet_id.in_(personal_wallet_ids)
+                )
+            )
+            session.execute(
+                delete(Wallet).where(Wallet.id.in_(personal_wallet_ids))
+            )
         user.email = f"deleted+{user.rid}@deleted.invalid"
         user.display_name = "Deleted user"
         user.hashed_password = ""

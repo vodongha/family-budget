@@ -8,6 +8,7 @@ from app.domains.categories.service import CategoryNotFoundError
 from app.domains.transactions.models import Transaction
 from app.domains.transactions.schemas import TransactionCreate, TransactionRead
 from app.domains.transactions.service import TransactionService
+from app.domains.wallets.models import WalletScope
 from app.domains.wallets.service import WalletNotFoundError
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -63,11 +64,15 @@ def create_transaction(
 def list_transactions(
     session: SessionDep,
     family_id: CurrentFamily,
+    current_user: CurrentUser,
     wallet_rid: str | None = Query(default=None),
+    scope: WalletScope = WalletScope.ALL,
     limit: int = Query(default=100, ge=1, le=500),
 ) -> list[TransactionRead]:
     try:
-        transactions = TransactionService(session).list(family_id, wallet_rid, limit)
+        transactions = TransactionService(session).list(
+            family_id, current_user.id, wallet_rid, scope.value, limit
+        )
     except WalletNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
