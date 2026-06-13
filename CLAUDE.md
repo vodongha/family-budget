@@ -138,13 +138,31 @@ requirements are both met:
 - `DELETE /auth/me` sets `users.is_deleted` + `deleted_at`. Login and `get_current_user`
   reject deleted users immediately (401), even with an otherwise-valid token.
 - **Owner rule:** an owner with other active members is blocked (`409`) — ownership must move
-  first, so a family is never orphaned. A **sole** owner also soft-deletes the family.
+  first (`POST /families/transfer-ownership {target_rid}`, owner-only, single-owner: the old
+  owner becomes a member), so a family is never orphaned. A **sole** owner also soft-deletes
+  the family.
 - **Purge job** (`app/domains/account/maintenance.py`, Celery Beat, daily): once `deleted_at`
   is older than `RETENTION_DAYS` (30), a fully-deleted **family** is hard-purged with all its
   data (transactions → wallets → invitations → members → family); a **member** soft-deleted
   inside a still-active family is **anonymised** (PII scrubbed) rather than deleted, because
   `transactions.created_by_user_id` is `NOT NULL` and references their row.
-- `PATCH /auth/me` updates the display name.
+- `PATCH /auth/me` updates the display name and optional **phone** (E.164, validated with
+  `phonenumbers` in `app/core/phone.py`, unique; blank clears it).
+
+### Family membership (`app/domains/families/`)
+
+`GET /members` lists active members; `POST /families/transfer-ownership` hands ownership to
+another active member (owner-only, single-owner). Mirrors the standard router/service/repository
+layout and is scoped by `get_current_family`.
+
+### Invitations to existing accounts
+
+`POST /invitations` matches the email/phone to an existing account (`invitations.target_user_id`).
+A match becomes an **in-app invite** (no registration link): the invitee reads `GET /invitations/inbox`
+and accepts via `POST /invitations/{rid}/accept-existing`, which moves them into the family
+(their now-empty old family is soft-deleted; an owner with other members gets `409` — transfer
+first) and returns a fresh JWT. `decline` dismisses it. New (unmatched) contacts keep the public
+link + register flow.
 
 ### CORS
 
