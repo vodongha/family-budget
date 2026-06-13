@@ -20,6 +20,17 @@ class TransactionCreate(BaseModel):
     occurred_on: date | None = None
 
 
+class TransactionUpdate(BaseModel):
+    """Full update of an existing transaction (the edit form sends every field)."""
+
+    wallet_rid: str
+    type: TransactionType
+    amount: int = Field(gt=0)
+    note: str | None = Field(default=None, max_length=500)
+    category_rid: str | None = None
+    occurred_on: date | None = None
+
+
 class TransactionRead(BaseModel):
     rid: str
     wallet_rid: str

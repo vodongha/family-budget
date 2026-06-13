@@ -78,9 +78,11 @@ class StatsService:
             key = (occurred_on.year, occurred_on.month)
             if key not in income:
                 continue
+            # Only income/expense count toward the trend; transfer legs move money
+            # between the family's own wallets and must not inflate either total.
             if type_ == "income":
                 income[key] += amount
-            else:
+            elif type_ == "expense":
                 expense[key] += amount
 
         return [
