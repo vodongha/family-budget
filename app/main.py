@@ -8,6 +8,7 @@ from app.domains.auth.router import router as auth_router
 from app.domains.dashboard.router import router as dashboard_router
 from app.domains.health.router import router as health_router
 from app.domains.invitations.router import router as invitations_router
+from app.domains.stats.router import router as stats_router
 from app.domains.transactions.router import router as transactions_router
 from app.domains.wallets.router import router as wallets_router
 
@@ -33,6 +34,7 @@ app.include_router(invitations_router)
 app.include_router(wallets_router)
 app.include_router(transactions_router)
 app.include_router(dashboard_router)
+app.include_router(stats_router)
 
 
 @app.get("/", tags=["meta"])
