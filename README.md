@@ -17,9 +17,12 @@ income/expense together, scoped per family.
 ### Backend (Phase 1 + 2 — done)
 
 - **Auth** — register (creates a family + owner), login (JWT), `GET /auth/me`
+- **Sign in with Google** — `POST /auth/google` verifies a Google ID token, links it to
+  an existing email or creates a new family; Google is unlinked on account deletion
 - **Roles** — `owner` / `member`; the person who creates a family owns it
-- **Invitations** — owner invites by email; the invitee accepts with a token + a
-  chosen password (auto-login); owner can revoke pending invites
+- **Invitations** — owner invites by **email or phone**; a public invite link lets the
+  invitee accept with a chosen password (auto-login); owner can revoke pending invites
+- **Statistics** — `GET /stats/monthly`: per-month income/expense totals for charts
 - **Profile & account deletion** — `PATCH /auth/me` (display name); `DELETE /auth/me`
   self-service deletion (Google Play policy): soft-delete now + scheduled 30-day purge.
   Owners must transfer ownership before deleting (sole owners tear down the whole family)
@@ -57,7 +60,7 @@ roadmap in [CLAUDE.md](CLAUDE.md).
 | DB driver | `oracledb` thin mode (no Instant Client; wallet-based mTLS) |
 | Migrations | Alembic (app-managed) |
 | Validation | Pydantic v2 |
-| Auth | OAuth2 password flow + JWT (`python-jose`); `bcrypt` hashing |
+| Auth | OAuth2 password flow + JWT (`python-jose`); `bcrypt` hashing; Google ID token (`google-auth`) |
 | Jobs (planned) | Celery + Celery Beat on Redis |
 | Storage (planned) | MinIO (receipt images) |
 | Lint / format | `ruff` |
@@ -76,12 +79,14 @@ family-budget/
 │   ├── main.py                 # FastAPI app, router registration
 │   ├── core/                   # config, database (lazy engine), security, deps, celery
 │   └── domains/                # one vertical slice per domain
-│       ├── auth/               # register / login / me
+│       ├── auth/               # register / login / me / google / profile / delete
+│       ├── account/            # scheduled purge of soft-deleted accounts
 │       ├── users/              # User + Family models, UserRole
-│       ├── invitations/        # invite / accept / revoke (owner-only)
+│       ├── invitations/        # invite by email/phone, public accept, revoke
 │       ├── wallets/            # wallets + derived balance
 │       ├── transactions/       # expense / income
 │       ├── dashboard/          # family totals
+│       ├── stats/              # monthly income/expense aggregation
 │       └── health/             # ADB connectivity probe
 ├── alembic/                    # migrations (env.py filters Oracle system tables)
 ├── tests/                      # pytest (SQLite in-memory)
@@ -122,6 +127,8 @@ python -m venv .venv && . .venv/Scripts/activate    # Windows: .venv\Scripts\act
 pip install -e ".[dev]"
 # WALLET_DIR in .env is /app/wallet (Docker); point it at the local wallet for local runs:
 export WALLET_DIR="$PWD/wallet"                      # PowerShell: $env:WALLET_DIR = "$PWD\wallet"
+# Optional — enables Sign in with Google (must match the client used by the app):
+export GOOGLE_CLIENT_ID="...apps.googleusercontent.com"
 uvicorn app.main:app --reload
 ```
 

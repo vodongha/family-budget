@@ -152,6 +152,22 @@ requirements are both met:
 calls this API from the browser; auth is a Bearer token (no cookies), so `allow_origins=["*"]`
 is acceptable. Tighten to specific origins for production.
 
+### Sign in with Google
+
+`POST /auth/google` accepts a Google **ID token** from the client and verifies it with
+`google-auth` (`app/core/google.py`, isolated so tests can mock it). The token's audience
+must be one of `settings.google_client_id` (comma-separated to allow web + Android + iOS
+client IDs). It then links the Google `sub` to an existing user with the same email, or
+creates a new family + owner. Google-only accounts have an **empty password hash** and can't
+password-login; deleting an account clears `google_sub` (unlink). Set `GOOGLE_CLIENT_ID` in
+the environment to enable it.
+
+### Statistics
+
+`GET /stats/monthly?months=N` (`app/domains/stats/`) returns per-month income/expense totals.
+Aggregation is done **in Python** (not a SQL `GROUP BY` with date functions) so the query
+stays portable across Oracle and the SQLite test database.
+
 ### Lazy database engine
 
 `app.core.database.get_engine()` builds the Oracle engine **on first use**, not at import time.
