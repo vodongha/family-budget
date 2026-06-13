@@ -9,6 +9,7 @@ from app.core.google import verify_google_id_token
 from app.core.phone import PhoneValidationError, normalize_phone
 from app.core.security import create_access_token, hash_password, verify_password
 from app.domains.auth.repository import AuthRepository
+from app.domains.categories.repository import CategoryRepository
 from app.domains.users.models import User, UserRole
 
 
@@ -36,6 +37,7 @@ class AuthService:
     def __init__(self, session: Session) -> None:
         self._session = session
         self._repo = AuthRepository(session)
+        self._categories = CategoryRepository(session)
 
     def _resolve_phone(self, raw: str | None, *, exclude_user_id: int | None) -> str | None:
         """Validate+normalise an optional phone and ensure it's not taken.
@@ -65,6 +67,7 @@ class AuthService:
             raise EmailAlreadyRegisteredError(email)
         normalized_phone = self._resolve_phone(phone, exclude_user_id=None)
         family = self._repo.add_family(family_name)
+        self._categories.seed_defaults(family.id)
         # The person who creates the family owns it.
         user = self._repo.add_user(
             email=email,
@@ -115,6 +118,7 @@ class AuthService:
 
         # Brand-new user — create their family and make them its owner.
         family = self._repo.add_family(f"{display_name}'s Family")
+        self._categories.seed_defaults(family.id)
         user = self._repo.add_user(
             email=email,
             hashed_password="",

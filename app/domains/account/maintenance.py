@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import delete, select, true
 from sqlalchemy.orm import Session
 
+from app.domains.categories.models import Category
 from app.domains.invitations.models import Invitation
 from app.domains.transactions.models import Transaction
 from app.domains.users.models import Family, User
@@ -52,6 +53,7 @@ def purge_expired_accounts(
     )
     for family_id in family_ids:
         session.execute(delete(Transaction).where(Transaction.family_id == family_id))
+        session.execute(delete(Category).where(Category.family_id == family_id))
         session.execute(delete(Wallet).where(Wallet.family_id == family_id))
         session.execute(delete(Invitation).where(Invitation.family_id == family_id))
         session.execute(delete(User).where(User.family_id == family_id))

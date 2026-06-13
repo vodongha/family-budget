@@ -21,6 +21,7 @@ class TransactionRepository:
         amount: int,
         note: str | None,
         occurred_on: date,
+        category_id: int | None = None,
     ) -> Transaction:
         transaction = Transaction(
             family_id=family_id,
@@ -30,6 +31,7 @@ class TransactionRepository:
             amount=amount,
             note=note,
             occurred_on=occurred_on,
+            category_id=category_id,
         )
         self._session.add(transaction)
         self._session.flush()
@@ -41,7 +43,10 @@ class TransactionRepository:
         stmt = (
             select(Transaction)
             .where(Transaction.family_id == family_id)
-            .options(selectinload(Transaction.wallet))
+            .options(
+                selectinload(Transaction.wallet),
+                selectinload(Transaction.category),
+            )
             .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
             .limit(limit)
         )
