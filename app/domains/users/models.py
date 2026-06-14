@@ -84,6 +84,12 @@ class User(Base):
         return self.family_id is not None
 
     @property
+    def family_name(self) -> str | None:
+        """The family's display name, or ``None`` when the user has no family.
+        Lazy-loaded via the ``family`` relationship."""
+        return self.family.name if self.family is not None else None
+
+    @property
     def has_password(self) -> bool:
         """Whether a password is set. Google-only accounts have none until they
         set one (then they can also sign in with email + password)."""

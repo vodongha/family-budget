@@ -18,6 +18,8 @@ class UserRead(BaseModel):
     display_name: str
     phone: str | None
     family_id: int | None
+    # The family's display name (null when the user has no family).
+    family_name: str | None = None
     # True once the user belongs to a family; the app uses it to route a brand-new
     # account to the "create or join a family" onboarding step.
     has_family: bool

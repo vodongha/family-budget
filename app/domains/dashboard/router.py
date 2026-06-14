@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.core.deps import CurrentFamily, CurrentUser, SessionDep
+from app.core.deps import CurrentUser, OptionalFamily, SessionDep
 from app.domains.dashboard.schemas import DashboardSummary
 from app.domains.dashboard.service import DashboardService
 from app.domains.wallets.models import WalletScope
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 )
 def summary(
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
     scope: WalletScope = WalletScope.ALL,
 ) -> DashboardSummary:

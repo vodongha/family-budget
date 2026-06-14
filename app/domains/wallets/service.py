@@ -1,4 +1,5 @@
-"""Wallet business logic — stateless; session + family_id passed in per call."""
+"""Wallet business logic — stateless. ``family_id`` may be ``None`` (the caller
+has no family): personal wallets work without one; family wallets require it."""
 
 from sqlalchemy.orm import Session
 
@@ -7,11 +8,15 @@ from app.domains.wallets.repository import WalletRepository
 
 
 class WalletNotFoundError(Exception):
-    """Raised when a wallet rid is not visible to the caller in this family."""
+    """Raised when a wallet rid is not visible to the caller."""
 
 
 class WalletPermissionError(Exception):
-    """Raised when the caller may see a wallet but isn't allowed to delete it."""
+    """Raised when the caller may see a wallet but isn't allowed to edit/delete it."""
+
+
+class WalletFamilyRequiredError(Exception):
+    """Raised when creating a shared (family) wallet without belonging to a family."""
 
 
 class WalletService:
@@ -21,26 +26,32 @@ class WalletService:
 
     def create(
         self,
-        family_id: int,
+        family_id: int | None,
         user_id: int,
         name: str,
         visibility: str = WalletVisibility.FAMILY.value,
         icon: str | None = None,
         color: str | None = None,
     ) -> tuple[Wallet, int, int]:
-        # A personal wallet is owned by (and private to) its creator.
-        owner_user_id = (
-            user_id if visibility == WalletVisibility.PERSONAL.value else None
-        )
+        if visibility == WalletVisibility.PERSONAL.value:
+            # Personal wallets belong to the user, independent of any family.
+            owner_user_id: int | None = user_id
+            wallet_family_id: int | None = None
+        else:
+            # A shared wallet needs a family to share within.
+            if family_id is None:
+                raise WalletFamilyRequiredError()
+            owner_user_id = None
+            wallet_family_id = family_id
         wallet = self._repo.add(
-            family_id, name, visibility, owner_user_id, icon, color
+            wallet_family_id, name, visibility, owner_user_id, icon, color
         )
         self._session.commit()
         return wallet, 0, 0
 
     def update(
         self,
-        family_id: int,
+        family_id: int | None,
         user_id: int,
         rid: str,
         requester_is_owner: bool,
@@ -70,32 +81,36 @@ class WalletService:
         if color is not None:
             wallet.color = color
         self._session.commit()
-        count = self._repo.counts_by_wallet(family_id, [wallet.id]).get(wallet.id, 0)
-        return wallet, self._repo.balance(family_id, wallet.id), count
+        count = self._repo.counts_by_wallet([wallet.id]).get(wallet.id, 0)
+        return wallet, self._repo.balance(wallet.id), count
 
     def list_with_balances(
-        self, family_id: int, user_id: int, scope: str = WalletScope.ALL.value
+        self, family_id: int | None, user_id: int, scope: str = WalletScope.ALL.value
     ) -> list[tuple[Wallet, int, int]]:
         wallets = self._repo.list(family_id, user_id, scope)
         ids = [wallet.id for wallet in wallets]
-        balances = self._repo.balances_by_wallet(family_id, ids)
-        counts = self._repo.counts_by_wallet(family_id, ids)
+        balances = self._repo.balances_by_wallet(ids)
+        counts = self._repo.counts_by_wallet(ids)
         return [
             (wallet, balances.get(wallet.id, 0), counts.get(wallet.id, 0))
             for wallet in wallets
         ]
 
     def get_with_balance(
-        self, family_id: int, user_id: int, rid: str
+        self, family_id: int | None, user_id: int, rid: str
     ) -> tuple[Wallet, int, int]:
         wallet = self._repo.get_visible_by_rid(family_id, user_id, rid)
         if wallet is None:
             raise WalletNotFoundError(rid)
-        count = self._repo.counts_by_wallet(family_id, [wallet.id]).get(wallet.id, 0)
-        return wallet, self._repo.balance(family_id, wallet.id), count
+        count = self._repo.counts_by_wallet([wallet.id]).get(wallet.id, 0)
+        return wallet, self._repo.balance(wallet.id), count
 
     def delete(
-        self, family_id: int, user_id: int, rid: str, requester_is_owner: bool
+        self,
+        family_id: int | None,
+        user_id: int,
+        rid: str,
+        requester_is_owner: bool,
     ) -> int:
         """Delete a wallet and all its transactions. Returns the number of
         transactions removed.
@@ -115,6 +130,6 @@ class WalletService:
             and not requester_is_owner
         ):
             raise WalletPermissionError(rid)
-        deleted = self._repo.delete_with_transactions(family_id, wallet.id)
+        deleted = self._repo.delete_with_transactions(wallet.id)
         self._session.commit()
         return deleted

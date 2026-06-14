@@ -14,11 +14,12 @@ class DashboardService:
         self._transactions = TransactionRepository(session)
 
     def summary(
-        self, family_id: int, user_id: int, scope: str = WalletScope.ALL.value
+        self, family_id: int | None, user_id: int, scope: str = WalletScope.ALL.value
     ) -> tuple[int, int, list[tuple[Wallet, int, int]]]:
         """Return (total_income, total_expense, [(wallet, balance, txn_count), ...])
-        over the wallets the caller may see under ``scope``."""
+        over the wallets the caller may see under ``scope``. Works without a
+        family (personal scope)."""
         wallets = self._wallets.list_with_balances(family_id, user_id, scope)
         ids = [wallet.id for wallet, _, _ in wallets]
-        total_income, total_expense = self._transactions.family_totals(family_id, ids)
+        total_income, total_expense = self._transactions.totals(ids)
         return total_income, total_expense, wallets

@@ -78,10 +78,121 @@ def test_create_family_when_already_in_one_is_409(
     assert resp.status_code == 409
 
 
-def test_family_scoped_endpoint_blocked_without_family(client: TestClient) -> None:
+def test_owner_renames_family(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    resp = client.patch("/families", json={"name": "Nhà Võ"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "Nhà Võ"
+
+
+def test_member_cannot_rename_family(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    member = _invite_member(client, auth_headers, "mom@example.com")
+    resp = client.patch("/families", json={"name": "X"}, headers=member)
+    assert resp.status_code == 403
+
+
+def test_sole_owner_deletes_family_keeps_personal(client: TestClient) -> None:
+    headers = _register(client, "solo2@example.com")
+    client.post(
+        "/wallets",
+        json={"name": "Riêng", "visibility": "personal"},
+        headers=headers,
+    )
+    resp = client.delete("/families", headers=headers)
+    assert resp.status_code == 200
+    new = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    assert client.get("/auth/me", headers=new).json()["has_family"] is False
+    personal = client.get("/wallets?scope=personal", headers=new).json()
+    assert [w["name"] for w in personal] == ["Riêng"]
+
+
+def test_owner_cannot_delete_family_with_members(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    _invite_member(client, auth_headers, "mom@example.com")
+    assert client.delete("/families", headers=auth_headers).status_code == 409
+
+
+def test_member_leaves_family(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    member = _invite_member(client, auth_headers, "mom@example.com")
+    resp = client.post("/families/leave", headers=member)
+    assert resp.status_code == 200
+    new = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    assert client.get("/auth/me", headers=new).json()["has_family"] is False
+    # The owner still has the family.
+    assert client.get("/auth/me", headers=auth_headers).json()["has_family"] is True
+
+
+def test_owner_with_members_cannot_leave(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    _invite_member(client, auth_headers, "mom@example.com")
+    assert client.post("/families/leave", headers=auth_headers).status_code == 409
+
+
+def test_owner_removes_member(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    member = _invite_member(client, auth_headers, "mom@example.com")
+    member_rid = client.get("/auth/me", headers=member).json()["rid"]
+    resp = client.delete(f"/families/members/{member_rid}", headers=auth_headers)
+    assert resp.status_code == 204
+    assert client.get("/auth/me", headers=member).json()["has_family"] is False
+
+
+def test_member_cannot_remove_others(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    member = _invite_member(client, auth_headers, "mom@example.com")
+    owner_rid = client.get("/auth/me", headers=auth_headers).json()["rid"]
+    resp = client.delete(f"/families/members/{owner_rid}", headers=member)
+    assert resp.status_code == 403
+
+
+def test_owner_cannot_remove_self(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    owner_rid = client.get("/auth/me", headers=auth_headers).json()["rid"]
+    resp = client.delete(f"/families/members/{owner_rid}", headers=auth_headers)
+    assert resp.status_code == 400
+
+
+def test_personal_works_without_family(client: TestClient) -> None:
     headers = _register_no_family(client, "solo@example.com")
-    # No family yet → the tenant-scoped dependency rejects the request.
-    assert client.get("/wallets", headers=headers).status_code == 403
+    # Personal space works with no family: empty wallet list, and a personal
+    # wallet can be created and used.
+    assert client.get("/wallets", headers=headers).status_code == 200
+    assert client.get("/wallets", headers=headers).json() == []
+    created = client.post(
+        "/wallets",
+        json={"name": "Ví của tôi", "visibility": "personal"},
+        headers=headers,
+    )
+    assert created.status_code == 201
+    wallets = client.get("/wallets?scope=personal", headers=headers).json()
+    assert [w["name"] for w in wallets] == ["Ví của tôi"]
+    # A shared (family) wallet still needs a family.
+    blocked = client.post(
+        "/wallets",
+        json={"name": "Chung", "visibility": "family"},
+        headers=headers,
+    )
+    assert blocked.status_code == 400
+    # Dashboard + a personal transaction work without a family too.
+    assert client.get("/dashboard/summary", headers=headers).status_code == 200
+    rid = created.json()["rid"]
+    txn = client.post(
+        "/transactions",
+        json={"wallet_rid": rid, "type": "income", "amount": 5000},
+        headers=headers,
+    )
+    assert txn.status_code == 201
+    assert client.get("/auth/me", headers=headers).json()["has_family"] is False
 
 
 def test_list_members_shows_owner_and_member(

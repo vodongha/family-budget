@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Response, status
 
-from app.core.deps import CurrentFamily, CurrentUser, SessionDep
+from app.core.deps import CurrentUser, OptionalFamily, SessionDep
 from app.domains.transfers.schemas import TransferCreate, TransferRead
 from app.domains.transfers.service import (
     SameWalletError,
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/transfers", tags=["transfers"])
 def create_transfer(
     payload: TransferCreate,
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
 ) -> TransferRead:
     """Move money between two wallets you can see, recorded as two linked legs.
@@ -65,7 +65,7 @@ def create_transfer(
 def delete_transfer(
     group_rid: str,
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
 ) -> Response:
     """Remove both legs of a transfer by its `group_rid`. `404` if not found."""

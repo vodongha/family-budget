@@ -131,11 +131,22 @@ router → service → repository → SQLAlchemy → Oracle ADB
   tenant context. Business logic lives here.
 - **Repositories are DB-only.** Read/write queries; always scoped by `family_id` for tenant data.
 
-### Tenant scope — `get_current_family`
+### Tenant scope — `get_current_family` / `get_optional_family`
 
-`app/core/deps.py` exposes `CurrentFamily` (an `int family_id` resolved from the JWT/user). This is
-the equivalent of a tenant key. Pass it into every service/repository call that reads or writes
-family-owned data. Treat a query without a `family_id` filter on tenant tables as a bug.
+`app/core/deps.py` exposes `CurrentFamily` (an `int family_id`, **403** if the user has none) and
+`OptionalFamily` (`int | None`). Family-only features (budgets, categories, members, invitations,
+transfer-ownership) use `CurrentFamily`. Features that also serve the **personal** space — wallets,
+transactions, transfers, dashboard, stats — use `OptionalFamily`, because **personal data works
+without a family**.
+
+**Personal vs family scoping (important).** `wallets.family_id` and `transactions.family_id` are
+**nullable**. A **personal** wallet is owned by `owner_user_id`, has `family_id = null`, and is
+visible regardless of family; a **family** wallet has `family_id` set + `visibility = family`.
+`visibility_clause(family_id, user_id, scope)` encodes this (personal = owner-only, family = the
+family's shared wallets, empty when `family_id is None`). Transaction/balance/stats queries scope by
+**`wallet_id ∈ visible_wallet_ids`** (which already encodes permission) — they do **not** filter by
+`family_id`, so they work for personal wallets too. A transaction's `family_id` just mirrors its
+wallet's. Don't re-add a `Transaction.family_id == family_id` filter.
 
 ### Account deletion & data retention (Google Play policy)
 
@@ -161,8 +172,18 @@ requirements are both met:
 ### Family membership (`app/domains/families/`)
 
 `GET /members` lists active members; `POST /families/transfer-ownership` hands ownership to
-another active member (owner-only, single-owner). Mirrors the standard router/service/repository
-layout and is scoped by `get_current_family`.
+another active member (owner-only, single-owner). Management:
+- `PATCH /families {name}` — rename (owner-only).
+- `DELETE /families` — delete the family + its **shared** data (`FamilyRepository.purge_family`),
+  owner-only and **only when no other members remain** (`409` otherwise). Personal data is kept; the
+  owner is detached. Returns a fresh JWT (family-less).
+- `POST /families/leave` — a member leaves (personal data kept); an owner with other members must
+  transfer first (`409`); a sole member leaving tears the empty family down. Fresh JWT.
+- `DELETE /families/members/{rid}` — owner removes a member (their personal data stays; `400` on
+  self, `404` if not a member).
+
+Anything that changes the caller's own `family_id` (create/delete/leave) returns a **fresh JWT**
+(the token embeds `family_id`); the app stores it and refreshes.
 
 ### Invitations to existing accounts
 

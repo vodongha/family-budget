@@ -55,3 +55,16 @@ def get_current_family(current_user: CurrentUser) -> int:
 
 
 CurrentFamily = Annotated[int, Depends(get_current_family)]
+
+
+def get_optional_family(current_user: CurrentUser) -> int | None:
+    """The caller's family_id, or ``None`` when they don't belong to one.
+
+    For endpoints that also serve the **personal** space (wallets, transactions,
+    dashboard, stats), which works without a family. Personal data is scoped by
+    the user, not the family; family scope is empty when this is ``None``.
+    """
+    return current_user.family_id
+
+
+OptionalFamily = Annotated[int | None, Depends(get_optional_family)]

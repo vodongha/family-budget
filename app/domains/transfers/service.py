@@ -33,7 +33,7 @@ class TransferService:
 
     def create(
         self,
-        family_id: int,
+        family_id: int | None,
         user_id: int,
         from_wallet_rid: str,
         to_wallet_rid: str,
@@ -53,7 +53,7 @@ class TransferService:
         group_rid = new_rid()
         on = occurred_on or date.today()
         self._txns.add(
-            family_id=family_id,
+            family_id=src.family_id,
             wallet_id=src.id,
             created_by_user_id=user_id,
             type_=TransactionType.TRANSFER_OUT,
@@ -63,7 +63,7 @@ class TransferService:
             transfer_group_rid=group_rid,
         )
         self._txns.add(
-            family_id=family_id,
+            family_id=dst.family_id,
             wallet_id=dst.id,
             created_by_user_id=user_id,
             type_=TransactionType.TRANSFER_IN,
@@ -75,8 +75,8 @@ class TransferService:
         self._session.commit()
         return group_rid, from_wallet_rid, to_wallet_rid, amount, on
 
-    def delete(self, family_id: int, user_id: int, group_rid: str) -> None:
-        legs = self._txns.list_by_transfer_group(family_id, group_rid)
+    def delete(self, family_id: int | None, user_id: int, group_rid: str) -> None:
+        legs = self._txns.list_by_transfer_group(group_rid)
         # Must exist and every leg's wallet must be visible to the caller.
         if not legs or any(
             self._wallets.get_visible_by_rid(family_id, user_id, leg.wallet.rid)

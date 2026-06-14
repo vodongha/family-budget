@@ -1,4 +1,6 @@
-"""DB access for transactions. Always scoped by family_id (tenant boundary)."""
+"""DB access for transactions. Scoped by ``wallet_id`` (which already encodes
+visibility via the wallet's family/owner), so no family filter is needed — this
+also works for personal-wallet transactions whose ``family_id`` is null."""
 
 # A method named ``list`` shadows the builtin in the class body, so ``list[int]``
 # annotations on later methods must stay lazy.
@@ -18,7 +20,7 @@ class TransactionRepository:
 
     def add(
         self,
-        family_id: int,
+        family_id: int | None,
         wallet_id: int,
         created_by_user_id: int,
         type_: TransactionType,
@@ -44,22 +46,21 @@ class TransactionRepository:
         return transaction
 
     def list_by_transfer_group(
-        self, family_id: int, transfer_group_rid: str
+        self, transfer_group_rid: str
     ) -> list[Transaction]:
+        # transfer_group_rid is a unique ULID; the caller verifies each leg's
+        # wallet is visible.
         stmt = (
             select(Transaction)
-            .where(
-                Transaction.family_id == family_id,
-                Transaction.transfer_group_rid == transfer_group_rid,
-            )
+            .where(Transaction.transfer_group_rid == transfer_group_rid)
             .options(selectinload(Transaction.wallet))
         )
         return list(self._session.scalars(stmt).all())
 
-    def get_by_rid(self, family_id: int, rid: str) -> Transaction | None:
+    def get_by_rid(self, rid: str) -> Transaction | None:
         stmt = (
             select(Transaction)
-            .where(Transaction.family_id == family_id, Transaction.rid == rid)
+            .where(Transaction.rid == rid)
             .options(
                 selectinload(Transaction.wallet),
                 selectinload(Transaction.category),
@@ -73,7 +74,6 @@ class TransactionRepository:
 
     def list(
         self,
-        family_id: int,
         wallet_id: int | None = None,
         wallet_ids: list[int] | None = None,
         limit: int = 100,
@@ -82,15 +82,14 @@ class TransactionRepository:
         date_from: date | None = None,
         date_to: date | None = None,
     ) -> list[Transaction]:
-        """Transactions for the family, newest first. When ``wallet_id`` is set,
-        restricts to that wallet; otherwise, when ``wallet_ids`` is given,
+        """Transactions in the given wallet(s), newest first. When ``wallet_id`` is
+        set, restricts to that wallet; otherwise, when ``wallet_ids`` is given,
         restricts to that set (empty set → no rows). Optional ``type_``,
         ``category_id`` and ``date_from``/``date_to`` filters narrow the result."""
         if wallet_ids is not None and not wallet_ids:
             return []
         stmt = (
             select(Transaction)
-            .where(Transaction.family_id == family_id)
             .options(
                 selectinload(Transaction.wallet),
                 selectinload(Transaction.category),
@@ -113,9 +112,7 @@ class TransactionRepository:
             stmt = stmt.where(Transaction.occurred_on <= date_to)
         return list(self._session.scalars(stmt).all())
 
-    def family_totals(
-        self, family_id: int, wallet_ids: list[int]
-    ) -> tuple[int, int]:
+    def totals(self, wallet_ids: list[int]) -> tuple[int, int]:
         """Return (total_income, total_expense) over the given wallets."""
         if not wallet_ids:
             return 0, 0
@@ -137,9 +134,6 @@ class TransactionRepository:
             ),
             0,
         )
-        stmt = select(income, expense).where(
-            Transaction.family_id == family_id,
-            Transaction.wallet_id.in_(wallet_ids),
-        )
+        stmt = select(income, expense).where(Transaction.wallet_id.in_(wallet_ids))
         total_income, total_expense = self._session.execute(stmt).one()
         return int(total_income), int(total_expense)
