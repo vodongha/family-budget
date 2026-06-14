@@ -200,7 +200,7 @@ The ADB wallet is **never** committed — it is materialised from base64 secrets
 **One-time setup:**
 
 ```bash
-fly apps create famo-api                       # must match `app` in fly.toml
+fly apps create famo-web                       # must match `app` in fly.toml
 fly redis create                               # Upstash Redis → gives a REDIS_URL
 
 # App secrets:
@@ -208,19 +208,19 @@ fly secrets set \
   ORACLE_PASSWORD=... WALLET_PASSWORD=... \
   JWT_SECRET="$(openssl rand -hex 32)" \
   GOOGLE_CLIENT_ID="...apps.googleusercontent.com" \
-  REDIS_URL="rediss://...upstash..." --app famo-api
+  REDIS_URL="rediss://...upstash..." --app famo-web
 
 # Wallet files as base64 secrets (values stay local, never printed):
 fly secrets set \
   WALLET_EWALLET_PEM_B64="$(base64 -w0 wallet/ewallet.pem)" \
   WALLET_TNSNAMES_B64="$(base64 -w0 wallet/tnsnames.ora)" \
-  WALLET_SQLNET_B64="$(base64 -w0 wallet/sqlnet.ora)" --app famo-api
+  WALLET_SQLNET_B64="$(base64 -w0 wallet/sqlnet.ora)" --app famo-web
 
 # Custom domain + TLS:
-fly certs add famo.io.vn --app famo-api        # then add the shown A/AAAA (or CNAME) DNS records
+fly certs add famo.io.vn --app famo-web        # then add the shown A/AAAA (or CNAME) DNS records
 
 # CI deploy token → add as the GitHub repo secret FLY_API_TOKEN:
-fly tokens create deploy --app famo-api
+fly tokens create deploy --app famo-web
 ```
 
 `ENV` and `WALLET_DIR` come from `fly.toml`; everything secret comes from `fly secrets`. Tighten

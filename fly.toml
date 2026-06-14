@@ -8,7 +8,7 @@
 # Redis (the Celery broker) is external — set REDIS_URL as a secret (e.g. an
 # Upstash Redis created with `fly redis create`).
 
-app = "famo-api"
+app = "famo-web"
 primary_region = "sin"  # Singapore — closest to ADB (ap-singapore-1) and Vietnam
 
 [build]
