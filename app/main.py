@@ -1,7 +1,10 @@
 """FastAPI application entry point."""
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.domains.auth.router import router as auth_router
@@ -168,10 +171,19 @@ app.include_router(stats_router)
 
 
 @app.get(
-    "/",
+    "/meta",
     tags=["meta"],
-    summary="Service root",
+    summary="Service metadata",
     description="Returns the app name and the running environment.",
 )
-def root() -> dict[str, str]:
+def meta() -> dict[str, str]:
     return {"app": "family-budget", "env": settings.env}
+
+
+# Serve the built Flutter web client at "/" (same origin as the API). Mounted
+# LAST so all API routes take precedence; the SPA uses hash routing, so the
+# static mount with html=True is enough (no server-side catch-all needed).
+# Guarded by existence so local dev / tests (no web/ build) are unaffected.
+_web_dir = Path(__file__).resolve().parent.parent / "web"
+if _web_dir.is_dir():
+    app.mount("/", StaticFiles(directory=str(_web_dir), html=True), name="web")
