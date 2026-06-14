@@ -64,12 +64,16 @@ class WalletRepository:
         name: str,
         visibility: str = WalletVisibility.FAMILY.value,
         owner_user_id: int | None = None,
+        icon: str | None = None,
+        color: str | None = None,
     ) -> Wallet:
         wallet = Wallet(
             family_id=family_id,
             name=name,
             visibility=visibility,
             owner_user_id=owner_user_id,
+            icon=icon,
+            color=color,
         )
         self._session.add(wallet)
         self._session.flush()

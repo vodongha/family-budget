@@ -32,6 +32,58 @@ def _invite_member(
     return {"Authorization": f"Bearer {accept.json()['access_token']}"}
 
 
+def _register_no_family(client: TestClient, email: str) -> dict[str, str]:
+    """Register without a family (the decoupled flow), then sign in."""
+    resp = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": "s3cret-pass",
+            "display_name": email.split("@")[0],
+        },
+    )
+    assert resp.status_code == 201
+    login = client.post(
+        "/auth/login", data={"username": email, "password": "s3cret-pass"}
+    )
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+def test_register_without_family_name_has_no_family(client: TestClient) -> None:
+    headers = _register_no_family(client, "solo@example.com")
+    me = client.get("/auth/me", headers=headers).json()
+    assert me["family_id"] is None
+    assert me["has_family"] is False
+
+
+def test_create_family_makes_owner_and_seeds_categories(client: TestClient) -> None:
+    headers = _register_no_family(client, "solo@example.com")
+    resp = client.post("/families", json={"name": "Solo Home"}, headers=headers)
+    assert resp.status_code == 201
+    new_token = resp.json()["access_token"]
+    new_headers = {"Authorization": f"Bearer {new_token}"}
+
+    me = client.get("/auth/me", headers=new_headers).json()
+    assert me["has_family"] is True
+    assert me["role"] == "owner"
+    # Default categories were seeded for the new family.
+    assert len(client.get("/categories", headers=new_headers).json()) > 0
+
+
+def test_create_family_when_already_in_one_is_409(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    # auth_headers already owns "Vo Family".
+    resp = client.post("/families", json={"name": "Another"}, headers=auth_headers)
+    assert resp.status_code == 409
+
+
+def test_family_scoped_endpoint_blocked_without_family(client: TestClient) -> None:
+    headers = _register_no_family(client, "solo@example.com")
+    # No family yet → the tenant-scoped dependency rejects the request.
+    assert client.get("/wallets", headers=headers).status_code == 403
+
+
 def test_list_members_shows_owner_and_member(
     client: TestClient, auth_headers: dict[str, str]
 ) -> None:

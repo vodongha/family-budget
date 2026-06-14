@@ -11,11 +11,16 @@ class AuthRepository:
         self._session = session
 
     def get_user_by_email(self, email: str) -> User | None:
-        # Soft-deleted accounts are not authenticatable. Use ``== false()`` (not
-        # ``.is_(False)``): Oracle has no native boolean, and ``IS 0`` is invalid
-        # SQL there (ORA-00908) — ``= 0`` is what we need.
+        # Match case-insensitively so a Google sign-in (which always returns a
+        # lowercased email) links to an account registered with any casing —
+        # i.e. the same person stays one account. Soft-deleted accounts are not
+        # authenticatable. Use ``== false()`` (not ``.is_(False)``): Oracle has
+        # no native boolean, and ``IS 0`` is invalid SQL there (ORA-00908).
         return self._session.scalar(
-            select(User).where(User.email == email, User.is_deleted == false())
+            select(User).where(
+                func.lower(User.email) == email.lower(),
+                User.is_deleted == false(),
+            )
         )
 
     def get_user_by_google_sub(self, google_sub: str) -> User | None:
@@ -56,7 +61,7 @@ class AuthRepository:
         email: str,
         hashed_password: str,
         display_name: str,
-        family_id: int,
+        family_id: int | None,
         role: UserRole,
         google_sub: str | None = None,
         phone: str | None = None,

@@ -76,3 +76,15 @@ class User(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     family: Mapped["Family | None"] = relationship(back_populates="members")
+
+    @property
+    def has_family(self) -> bool:
+        """Whether the user belongs to a family yet. A freshly registered (or new
+        Google) account has none until they create or join one."""
+        return self.family_id is not None
+
+    @property
+    def has_password(self) -> bool:
+        """Whether a password is set. Google-only accounts have none until they
+        set one (then they can also sign in with email + password)."""
+        return bool(self.hashed_password)

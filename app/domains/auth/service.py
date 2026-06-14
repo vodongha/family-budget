@@ -60,21 +60,33 @@ class AuthService:
         email: str,
         password: str,
         display_name: str,
-        family_name: str,
+        family_name: str | None = None,
         phone: str | None = None,
     ) -> User:
+        """Create a new account.
+
+        When ``family_name`` is given the account also gets a fresh family it
+        **owns** (a convenience path). Otherwise the account starts with no
+        family and creates or joins one after first login (``POST /families`` or
+        accepting an invitation).
+        """
+        email = email.strip().lower()
         if self._repo.get_user_by_email(email) is not None:
             raise EmailAlreadyRegisteredError(email)
         normalized_phone = self._resolve_phone(phone, exclude_user_id=None)
-        family = self._repo.add_family(family_name)
-        self._categories.seed_defaults(family.id)
-        # The person who creates the family owns it.
+        family_id: int | None = None
+        role = UserRole.MEMBER
+        if family_name and family_name.strip():
+            family = self._repo.add_family(family_name.strip())
+            self._categories.seed_defaults(family.id)
+            family_id = family.id
+            role = UserRole.OWNER  # the person who creates the family owns it
         user = self._repo.add_user(
             email=email,
             hashed_password=hash_password(password),
             display_name=display_name,
-            family_id=family.id,
-            role=UserRole.OWNER,
+            family_id=family_id,
+            role=role,
             phone=normalized_phone,
         )
         self._session.commit()
@@ -95,15 +107,16 @@ class AuthService:
         """Sign in (or sign up) with a verified Google ID token.
 
         Links the Google account to an existing user with the same email, or
-        creates a new family owned by the new user. Raises [GoogleAuthError] if
-        the token is invalid.
+        creates a brand-new account with **no family** (it creates or joins one
+        after first login, like password registration). Raises [GoogleAuthError]
+        if the token is invalid.
         """
         client_ids = [
             c.strip() for c in settings.google_client_id.split(",") if c.strip()
         ]
         claims = verify_google_id_token(id_token, client_ids)
         google_sub = claims["sub"]
-        email = claims["email"]
+        email = claims["email"].strip().lower()
         display_name = claims.get("name") or email.split("@")[0]
 
         user = self._repo.get_user_by_google_sub(google_sub)
@@ -116,15 +129,13 @@ class AuthService:
             self._session.commit()
             return user
 
-        # Brand-new user — create their family and make them its owner.
-        family = self._repo.add_family(f"{display_name}'s Family")
-        self._categories.seed_defaults(family.id)
+        # Brand-new user — no family yet; they create or join one after sign-in.
         user = self._repo.add_user(
             email=email,
             hashed_password="",
             display_name=display_name,
-            family_id=family.id,
-            role=UserRole.OWNER,
+            family_id=None,
+            role=UserRole.MEMBER,
             google_sub=google_sub,
         )
         self._session.commit()
@@ -134,6 +145,23 @@ class AuthService:
         return create_access_token(
             subject=user.rid, extra={"family_id": user.family_id}
         )
+
+    def change_password(
+        self, user: User, current_password: str | None, new_password: str
+    ) -> None:
+        """Set or change the account password.
+
+        For an account that already has a password, ``current_password`` must
+        match. A Google-only account (no password yet) may set one without a
+        current password; afterwards it can also sign in with email + password.
+        """
+        if user.hashed_password:
+            if not current_password or not verify_password(
+                current_password, user.hashed_password
+            ):
+                raise InvalidCredentialsError()
+        user.hashed_password = hash_password(new_password)
+        self._session.commit()
 
     def update_profile(
         self, user: User, display_name: str, phone: str | None

@@ -55,9 +55,10 @@ def test_owner_invites_and_invitee_joins_same_family(
     assert [w["name"] for w in wallets] == ["Cash"]
 
 
-def test_member_cannot_invite(
+def test_member_can_invite_as_member(
     client: TestClient, auth_headers: dict[str, str]
 ) -> None:
+    # Any family member can invite others (the invitee always joins as member).
     invite = client.post(
         "/invitations", json={"email": "mom@example.com"}, headers=auth_headers
     )
@@ -74,7 +75,22 @@ def test_member_cannot_invite(
     resp = client.post(
         "/invitations", json={"email": "kid@example.com"}, headers=member_headers
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 201
+    assert resp.json()["role"] == "member"
+
+    # A member's invite is still accepted into the same family.
+    accept_kid = client.post(
+        "/invitations/accept",
+        json={
+            "token": resp.json()["token"],
+            "password": "kid-pass1",
+            "display_name": "Kid",
+        },
+    )
+    kid_headers = {"Authorization": f"Bearer {accept_kid.json()['access_token']}"}
+    kid_family = client.get("/auth/me", headers=kid_headers).json()["family_id"]
+    owner_family = client.get("/auth/me", headers=auth_headers).json()["family_id"]
+    assert kid_family == owner_family
 
 
 def test_accept_with_unknown_token_is_404(client: TestClient) -> None:
