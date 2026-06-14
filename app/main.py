@@ -11,6 +11,7 @@ from app.domains.dashboard.router import router as dashboard_router
 from app.domains.families.router import router as families_router
 from app.domains.health.router import router as health_router
 from app.domains.invitations.router import router as invitations_router
+from app.domains.legal.router import router as legal_router
 from app.domains.stats.router import router as stats_router
 from app.domains.transactions.router import router as transactions_router
 from app.domains.transfers.router import router as transfers_router
@@ -114,6 +115,11 @@ TAGS_METADATA = [
         "description": "Aggregations for charts — monthly income / expense series and "
         "per-category breakdowns.",
     },
+    {
+        "name": "legal",
+        "description": "Public legal pages. `GET /privacy` serves the bilingual "
+        "(vi/en) privacy policy used for the Google Play listing.",
+    },
 ]
 
 app = FastAPI(
@@ -146,6 +152,7 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(legal_router)
 app.include_router(auth_router)
 app.include_router(families_router)
 app.include_router(invitations_router)

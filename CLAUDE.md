@@ -9,6 +9,8 @@ together; every member sees the same data, scoped to their family. Multi-tenant 
 - **Backend:** FastAPI (Python) REST API
 - **Mobile:** Flutter (Android + iOS) — separate workspace / `mobile/` later
 - **Host (planned):** Oracle Cloud Ampere A1 free tier, all containers
+- **Domain:** `famo.io.vn` (production API). The privacy-policy URL for Google Play is
+  `https://famo.io.vn/privacy`; the app builds with `--dart-define=API_BASE_URL=https://famo.io.vn`.
 - **Status:** Phase 1 — connection spike + auth skeleton landed and verified against live ADB.
 
 The architecture deliberately mirrors a layered service design (the author's day-job pattern):
@@ -111,9 +113,9 @@ family-budget/
 ### Domains
 
 Built: `users`, `auth`, `families`, `invitations`, `categories`, `wallets`, `transactions`,
-`transfers`, `budgets`, `dashboard`, `stats`, `account`, `health`. Planned: `reports`, `ocr`,
-`ai`. Each follows the same `router / service / repository / schemas / models (/ tasks for
-Celery)` layout.
+`transfers`, `budgets`, `dashboard`, `stats`, `account`, `legal`, `health`. Planned: `reports`,
+`ocr`, `ai`. Each follows the same `router / service / repository / schemas / models (/ tasks for
+Celery)` layout (`legal` is router-only — it serves a static HTML page, no DB).
 
 ## Architecture & conventions
 
@@ -204,6 +206,15 @@ endpoints — each constrains its transaction/balance aggregation to the caller'
 visible wallet ids. **Delete:** a personal wallet by its owner; a shared family
 wallet only by the family owner (`403` otherwise). New wallets default to family;
 `POST /wallets {visibility: "personal"}` makes a private one (owner = creator).
+
+### Privacy policy (`app/domains/legal/`)
+
+`GET /privacy?lang=vi|en` serves a **public, no-auth** bilingual HTML page (default `vi`). It is
+the single source of truth for the policy: Google Play uses the URL for the store listing / Data
+Safety form, and the Flutter app embeds the same URL in an in-app WebView. The router is the only
+layer (`legal` has no service/repository) — content + inline CSS live in `router.py` as
+per-language section bundles. Keep it framable (don't add `X-Frame-Options`) so the in-app WebView
+and the web iframe can load it. Update `EFFECTIVE_DATE` when the policy text changes.
 
 ### Statistics
 
