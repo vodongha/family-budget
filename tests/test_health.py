@@ -15,7 +15,7 @@ def test_health_endpoint_responds(client: TestClient) -> None:
     assert "status" in body
 
 
-def test_root(client: TestClient) -> None:
-    resp = client.get("/")
+def test_meta(client: TestClient) -> None:
+    resp = client.get("/meta")
     assert resp.status_code == 200
     assert resp.json()["app"] == "family-budget"

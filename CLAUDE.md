@@ -381,6 +381,13 @@ Production runs on **Fly.io**, region `sin` (Singapore — closest to ADB), doma
   (`WALLET_EWALLET_PEM_B64`, `WALLET_TNSNAMES_B64`, `WALLET_SQLNET_B64`) into `WALLET_DIR` at
   startup; the entrypoint runs for **every** process group so all machines get the wallet. Skipped
   when those vars are unset (local / docker-compose, where the wallet is bind-mounted).
+- **Web client (same-origin):** the Dockerfile's first stage builds the Flutter **web** target
+  from the public `family-budget-app` repo (`flutter create . --platforms=web` → `flutter build
+  web` with `API_BASE_URL=https://famo.io.vn`) and copies it to `/app/web`. `main.py` mounts it
+  with `StaticFiles(html=True)` at `/` **after** all API routers (the SPA uses hash routing, so no
+  catch-all is needed). So `famo.io.vn` serves the app at `/` and the API at its routes — one
+  origin, no CORS needed for the browser. The service-info JSON moved from `/` to `/meta`. The
+  mount is guarded by directory existence, so local dev / tests (no `web/`) are unaffected.
 - **Redis:** external (Celery broker). Provision Upstash via `fly redis create` and set
   `REDIS_URL`. The API itself never touches Redis — only the worker does.
 - **Secrets** (set with `fly secrets set`, never committed): `ORACLE_PASSWORD`, `WALLET_PASSWORD`,
