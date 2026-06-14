@@ -63,6 +63,7 @@ class TransactionRepository:
             .options(
                 selectinload(Transaction.wallet),
                 selectinload(Transaction.category),
+                selectinload(Transaction.creator),
             )
         )
         return self._session.scalar(stmt)
@@ -93,6 +94,7 @@ class TransactionRepository:
             .options(
                 selectinload(Transaction.wallet),
                 selectinload(Transaction.category),
+                selectinload(Transaction.creator),
             )
             .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
             .limit(limit)

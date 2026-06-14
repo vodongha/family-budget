@@ -31,6 +31,11 @@ class TransactionUpdate(BaseModel):
     occurred_on: date | None = None
 
 
+class TransactionCreator(BaseModel):
+    rid: str
+    display_name: str
+
+
 class TransactionRead(BaseModel):
     rid: str
     wallet_rid: str
@@ -39,4 +44,7 @@ class TransactionRead(BaseModel):
     note: str | None
     occurred_on: date
     category: CategoryRead | None
+    # Who recorded it + whether the current caller may edit/delete it (creator only).
+    created_by: TransactionCreator
+    can_edit: bool
     created_at: datetime

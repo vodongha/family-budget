@@ -17,6 +17,10 @@ class TransactionNotFoundError(Exception):
     """Raised when a transaction rid is unknown or not visible to the caller."""
 
 
+class NotTransactionOwnerError(Exception):
+    """Raised when someone tries to edit/delete a transaction they didn't create."""
+
+
 class TransactionService:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -121,6 +125,8 @@ class TransactionService:
             is None
         ):
             raise TransactionNotFoundError(rid)
+        if transaction.created_by_user_id != user_id:
+            raise NotTransactionOwnerError(rid)
         wallet = self._wallets.get_visible_by_rid(family_id, user_id, wallet_rid)
         if wallet is None:
             raise WalletNotFoundError(wallet_rid)
@@ -143,5 +149,7 @@ class TransactionService:
             is None
         ):
             raise TransactionNotFoundError(rid)
+        if transaction.created_by_user_id != user_id:
+            raise NotTransactionOwnerError(rid)
         self._repo.delete(transaction)
         self._session.commit()

@@ -76,6 +76,59 @@ def test_filter_by_date_range(client: TestClient, auth_headers: dict[str, str]) 
     assert amounts == [2]
 
 
+def test_read_carries_creator_and_can_edit(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    w = _wallet(client, auth_headers)
+    created = _txn(client, auth_headers, w)
+    assert created["created_by"]["display_name"] == "Dad"
+    assert created["can_edit"] is True
+
+
+def test_member_cannot_edit_or_delete_others_family_txn(client: TestClient) -> None:
+    # Owner creates a family wallet + transaction.
+    client.post(
+        "/auth/register",
+        json={
+            "email": "a@example.com",
+            "password": "s3cret-pass",
+            "display_name": "A",
+            "family_name": "Fam",
+        },
+    )
+    login = client.post(
+        "/auth/login", data={"username": "a@example.com", "password": "s3cret-pass"}
+    )
+    owner_h = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    w = _wallet(client, owner_h)
+    rid = _txn(client, owner_h, w)["rid"]
+
+    # A second member joins the family.
+    token = client.post(
+        "/invitations", json={"email": "b@example.com"}, headers=owner_h
+    ).json()["token"]
+    accept = client.post(
+        "/invitations/accept",
+        json={"token": token, "password": "p", "display_name": "B"},
+    )
+    member_h = {"Authorization": f"Bearer {accept.json()['access_token']}"}
+
+    # The member can SEE the owner's transaction (shared family wallet)...
+    listed = client.get("/transactions", headers=member_h).json()
+    mine = next(x for x in listed if x["rid"] == rid)
+    assert mine["created_by"]["display_name"] == "A"
+    assert mine["can_edit"] is False
+
+    # ...but cannot edit or delete it (403).
+    edit = client.patch(
+        f"/transactions/{rid}",
+        json={"wallet_rid": w, "type": "expense", "amount": 999},
+        headers=member_h,
+    )
+    assert edit.status_code == 403
+    assert client.delete(f"/transactions/{rid}", headers=member_h).status_code == 403
+
+
 def test_cannot_edit_other_members_personal_txn(client: TestClient) -> None:
     # Owner makes a personal wallet + txn; another member must not see/edit it.
     client.post(
