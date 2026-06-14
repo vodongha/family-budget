@@ -42,6 +42,8 @@ income/expense together, scoped per family.
   (`POST /transfers`, `DELETE /transfers/{group_rid}`); excluded from income/expense totals
 - **Dashboard** — `GET /dashboard/summary`: total income / expense / net + per-wallet balances
 - **Multi-tenant isolation** — every query is scoped by `family_id`; one family cannot see another's data
+- **Privacy policy** — `GET /privacy?lang=vi|en` serves a public, bilingual HTML page (the
+  Google Play store-listing URL; also embedded in-app via a WebView)
 - **Health** — `GET /health` runs `SELECT 1 FROM dual` to verify the ADB connection
 
 ### Planned
@@ -98,6 +100,7 @@ family-budget/
 │       ├── transactions/       # expense / income
 │       ├── dashboard/          # family totals
 │       ├── stats/              # monthly income/expense aggregation
+│       ├── legal/              # public bilingual privacy policy (HTML)
 │       └── health/             # ADB connectivity probe
 ├── alembic/                    # migrations (env.py filters Oracle system tables)
 ├── tests/                      # pytest (SQLite in-memory)
