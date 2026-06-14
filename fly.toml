@@ -17,6 +17,10 @@ primary_region = "sin"  # Singapore — closest to ADB (ap-singapore-1) and Viet
 [env]
   ENV = "production"
   WALLET_DIR = "/app/wallet"
+  # Non-secret DB config (already documented in CLAUDE.md). The password +
+  # wallet are Fly secrets; the DSN alias and user are plain config.
+  ORACLE_USER = "ADMIN"
+  ORACLE_DSN = "vodongha_tp"
 
 # Apply DB migrations before each release goes live (aborts the deploy on failure).
 [deploy]
