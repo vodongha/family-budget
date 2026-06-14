@@ -366,6 +366,27 @@ GIT_COMMITTER_NAME="Claude Opus 4.8" GIT_COMMITTER_EMAIL="noreply@anthropic.com"
   git commit --author="vodongha <vodongha@hotmail.com>" -m "..."
 ```
 
+## Deployment (Fly.io)
+
+Production runs on **Fly.io**, region `sin` (Singapore — closest to ADB), domain `famo.io.vn`.
+
+- **CI/CD:** `.github/workflows/deploy.yml` deploys on push to `master` (ruff + pytest →
+  `flyctl deploy --remote-only`, needs the `FLY_API_TOKEN` repo secret). `ci.yml` runs the same
+  checks on PRs only (no double run on push). Mirrors the `vodongha-personal` website setup.
+- **`fly.toml`:** two process groups from one image — `app` (FastAPI, the only HTTP group;
+  `auto_stop = suspend`, `min_machines_running = 0`) and `worker` (`celery worker --beat`, runs
+  continuously so the daily purge fires). `[deploy] release_command = "alembic upgrade head"`
+  migrates before each release. VM 512MB each.
+- **Wallet on Fly:** never committed/baked. `scripts/fly_entrypoint.sh` decodes base64 secrets
+  (`WALLET_EWALLET_PEM_B64`, `WALLET_TNSNAMES_B64`, `WALLET_SQLNET_B64`) into `WALLET_DIR` at
+  startup; the entrypoint runs for **every** process group so all machines get the wallet. Skipped
+  when those vars are unset (local / docker-compose, where the wallet is bind-mounted).
+- **Redis:** external (Celery broker). Provision Upstash via `fly redis create` and set
+  `REDIS_URL`. The API itself never touches Redis — only the worker does.
+- **Secrets** (set with `fly secrets set`, never committed): `ORACLE_PASSWORD`, `WALLET_PASSWORD`,
+  `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `REDIS_URL`, and the three `WALLET_*_B64`. See the README
+  "Deploy (Fly.io)" section for the exact one-time commands.
+
 ## Gotchas (learned the hard way — read before debugging these)
 
 - **PyPI package is `oracledb`, not `python-oracledb`.** Installing `python-oracledb` fails with

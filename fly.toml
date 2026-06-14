@@ -1,0 +1,59 @@
+# fly.toml — Family Budget API (famo.io.vn)
+# Docs: https://fly.io/docs/reference/configuration/
+#
+# Two process groups share one image:
+#   - app    : the FastAPI server (HTTP, can auto-suspend when idle)
+#   - worker : a Celery worker with embedded beat (`--beat`) for the daily
+#              account-purge job. Runs continuously so the schedule fires.
+# Redis (the Celery broker) is external — set REDIS_URL as a secret (e.g. an
+# Upstash Redis created with `fly redis create`).
+
+app = "famo-api"
+primary_region = "sin"  # Singapore — closest to ADB (ap-singapore-1) and Vietnam
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ENV = "production"
+  WALLET_DIR = "/app/wallet"
+
+# Apply DB migrations before each release goes live (aborts the deploy on failure).
+[deploy]
+  release_command = "alembic upgrade head"
+
+[processes]
+  app = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+  worker = "celery -A app.core.celery_app.celery worker --beat --loglevel=info"
+
+# HTTP only for the `app` process. It may suspend when idle to save cost and
+# resume on the next request; the worker keeps running regardless.
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 200
+    soft_limit = 150
+
+[[http_service.checks]]
+  grace_period = "20s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["worker"]
