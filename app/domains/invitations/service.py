@@ -85,7 +85,11 @@ class InvitationService:
         phone: str | None,
         role: UserRole,
     ) -> Invitation:
-        self._require_owner(current_user)
+        # Any active family member can invite others. Only an owner may grant a
+        # non-member role; everyone else can only invite plain members (the
+        # single-owner model means ownership moves via transfer, not invites).
+        if current_user.role != UserRole.OWNER.value:
+            role = UserRole.MEMBER
         target = self._find_existing_target(family_id, email, phone)
         if target is not None:
             # Existing account → in-app invite, no link.
@@ -144,7 +148,7 @@ class InvitationService:
         invitation = self._repo.get_by_token(token)
         if invitation is None or invitation.status != InvitationStatus.PENDING.value:
             raise InvitationNotFoundError(token)
-        final_email = invitation.email or email
+        final_email = (invitation.email or email or "").strip().lower()
         if not final_email:
             raise MissingEmailError()
         if self._auth.get_user_by_email(final_email) is not None:

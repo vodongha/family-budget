@@ -25,6 +25,47 @@ def test_list_wallets_returns_created(
     assert names == {"Cash", "Bank"}
 
 
+def test_create_wallet_with_icon_and_color(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    resp = client.post(
+        "/wallets",
+        json={"name": "Cash", "icon": "💵", "color": "#22C55E"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["icon"] == "💵"
+    assert body["color"] == "#22C55E"
+
+
+def test_update_wallet_name_icon_color(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    rid = client.post(
+        "/wallets", json={"name": "Cash"}, headers=auth_headers
+    ).json()["rid"]
+    resp = client.patch(
+        f"/wallets/{rid}",
+        json={"name": "Wallet", "icon": "🏦", "color": "#5B5BF0"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["name"] == "Wallet"
+    assert body["icon"] == "🏦"
+    assert body["color"] == "#5B5BF0"
+
+
+def test_update_unknown_wallet_is_404(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    resp = client.patch(
+        "/wallets/NOPE", json={"name": "X"}, headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+
 def test_wallets_require_auth(client: TestClient) -> None:
     assert client.get("/wallets").status_code == 401
 

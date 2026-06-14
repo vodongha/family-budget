@@ -25,14 +25,53 @@ class WalletService:
         user_id: int,
         name: str,
         visibility: str = WalletVisibility.FAMILY.value,
+        icon: str | None = None,
+        color: str | None = None,
     ) -> tuple[Wallet, int, int]:
         # A personal wallet is owned by (and private to) its creator.
         owner_user_id = (
             user_id if visibility == WalletVisibility.PERSONAL.value else None
         )
-        wallet = self._repo.add(family_id, name, visibility, owner_user_id)
+        wallet = self._repo.add(
+            family_id, name, visibility, owner_user_id, icon, color
+        )
         self._session.commit()
         return wallet, 0, 0
+
+    def update(
+        self,
+        family_id: int,
+        user_id: int,
+        rid: str,
+        requester_is_owner: bool,
+        *,
+        name: str | None = None,
+        icon: str | None = None,
+        color: str | None = None,
+    ) -> tuple[Wallet, int, int]:
+        """Edit a wallet's name/icon/colour. Permission mirrors delete: a personal
+        wallet by its owner (guaranteed by visibility), a shared family wallet
+        only by the family owner. Only provided (non-None) fields change.
+
+        Raises [WalletNotFoundError] if not visible, [WalletPermissionError] if
+        visible but not editable by this caller."""
+        wallet = self._repo.get_visible_by_rid(family_id, user_id, rid)
+        if wallet is None:
+            raise WalletNotFoundError(rid)
+        if (
+            wallet.visibility == WalletVisibility.FAMILY.value
+            and not requester_is_owner
+        ):
+            raise WalletPermissionError(rid)
+        if name is not None:
+            wallet.name = name
+        if icon is not None:
+            wallet.icon = icon
+        if color is not None:
+            wallet.color = color
+        self._session.commit()
+        count = self._repo.counts_by_wallet(family_id, [wallet.id]).get(wallet.id, 0)
+        return wallet, self._repo.balance(family_id, wallet.id), count
 
     def list_with_balances(
         self, family_id: int, user_id: int, scope: str = WalletScope.ALL.value

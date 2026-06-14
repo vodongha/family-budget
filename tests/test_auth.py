@@ -56,3 +56,42 @@ def test_login_wrong_password_is_unauthorized(client: TestClient) -> None:
 
 def test_me_without_token_is_unauthorized(client: TestClient) -> None:
     assert client.get("/auth/me").status_code == 401
+
+
+def test_change_password_updates_login(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    # auth_headers = dad@example.com / s3cret-pass, has_password True.
+    assert client.get("/auth/me", headers=auth_headers).json()["has_password"] is True
+    resp = client.post(
+        "/auth/change-password",
+        json={"current_password": "s3cret-pass", "new_password": "new-s3cret-1"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 204
+    # Old password no longer works; new one does.
+    assert (
+        client.post(
+            "/auth/login",
+            data={"username": "dad@example.com", "password": "s3cret-pass"},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/auth/login",
+            data={"username": "dad@example.com", "password": "new-s3cret-1"},
+        ).status_code
+        == 200
+    )
+
+
+def test_change_password_wrong_current_is_400(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    resp = client.post(
+        "/auth/change-password",
+        json={"current_password": "wrong", "new_password": "new-s3cret-1"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400

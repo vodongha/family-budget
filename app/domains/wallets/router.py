@@ -5,7 +5,12 @@ from fastapi import APIRouter, HTTPException, status
 from app.core.deps import CurrentFamily, CurrentUser, SessionDep
 from app.domains.users.models import UserRole
 from app.domains.wallets.models import Wallet, WalletScope
-from app.domains.wallets.schemas import WalletCreate, WalletDeleteResult, WalletRead
+from app.domains.wallets.schemas import (
+    WalletCreate,
+    WalletDeleteResult,
+    WalletRead,
+    WalletUpdate,
+)
 from app.domains.wallets.service import (
     WalletNotFoundError,
     WalletPermissionError,
@@ -19,6 +24,8 @@ def _to_read(wallet: Wallet, balance: int, txn_count: int = 0) -> WalletRead:
     return WalletRead(
         rid=wallet.rid,
         name=wallet.name,
+        icon=wallet.icon,
+        color=wallet.color,
         visibility=wallet.visibility,  # type: ignore[arg-type]
         balance=balance,
         txn_count=txn_count,
@@ -41,8 +48,47 @@ def create_wallet(
     """Create a `family` (shared) or `personal` (private to you) wallet. Defaults
     to family."""
     wallet, balance, count = WalletService(session).create(
-        family_id, current_user.id, payload.name, payload.visibility.value
+        family_id,
+        current_user.id,
+        payload.name,
+        payload.visibility.value,
+        payload.icon,
+        payload.color,
     )
+    return _to_read(wallet, balance, count)
+
+
+@router.patch("/{rid}", response_model=WalletRead, summary="Edit a wallet")
+def update_wallet(
+    rid: str,
+    payload: WalletUpdate,
+    session: SessionDep,
+    family_id: CurrentFamily,
+    current_user: CurrentUser,
+) -> WalletRead:
+    """Rename a wallet or change its icon/colour. A personal wallet can be edited
+    by its owner; a shared family wallet only by the family owner (`403`). `404`
+    if it isn't visible to you. Visibility can't be changed."""
+    is_owner = current_user.role == UserRole.OWNER.value
+    try:
+        wallet, balance, count = WalletService(session).update(
+            family_id,
+            current_user.id,
+            rid,
+            is_owner,
+            name=payload.name,
+            icon=payload.icon,
+            color=payload.color,
+        )
+    except WalletNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
+        ) from None
+    except WalletPermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the family owner can edit a shared wallet",
+        ) from None
     return _to_read(wallet, balance, count)
 
 

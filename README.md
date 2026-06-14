@@ -16,25 +16,34 @@ income/expense together, scoped per family.
 
 ### Backend (Phase 1 + 2 — done)
 
-- **Auth** — register (creates a family + owner), login (JWT), `GET /auth/me`; optional
-  **phone** (E.164, validated with `phonenumbers`, unique)
-- **Sign in with Google** — `POST /auth/google` verifies a Google ID token, links it to
-  an existing email or creates a new family; Google is unlinked on account deletion
-- **Roles & members** — `owner` / `member`; the family creator owns it. `GET /members`
-  lists the family; `POST /families/transfer-ownership` hands ownership to another member
-  (single-owner — the old owner becomes a member)
-- **Invitations** — owner invites by **email or phone**. A new contact gets a public invite
-  link (accept with a chosen password → auto-login). A contact that **already has an account**
-  gets an **in-app invite** (`GET /invitations/inbox` → `POST /invitations/{rid}/accept-existing`
-  / `decline`) and is moved into the family in one tap, with consent — no link. Owner can revoke
+- **Auth** — register an **account** (login + `GET /auth/me`); the account joins or creates a
+  family afterwards, so registration no longer forces a family up front (`family_name` optional —
+  pass it to create+own a family in one step). `POST /families` creates a family and makes you its
+  owner. `POST /auth/change-password` changes the password — or **sets the first one** for a
+  Google-only account. Optional **phone** (E.164, validated with `phonenumbers`, unique)
+- **Sign in with Google** — `POST /auth/google` verifies a Google ID token and links it to an
+  existing account by email (**case-insensitive**, so the same person stays one account); a brand-new
+  Google account starts with no family (creates/joins one after sign-in). Google is unlinked on
+  account deletion
+- **Roles & members** — `owner` / `member`. `GET /members` lists the family;
+  `POST /families/transfer-ownership` hands ownership to another member (single-owner — the old
+  owner becomes a member)
+- **Invitations** — **any family member** invites by **email or phone** (the invitee always joins
+  as a member). A new contact gets a public invite link (accept with a chosen password →
+  auto-login). A contact that **already has an account** gets an **in-app invite**
+  (`GET /invitations/inbox` → `POST /invitations/{rid}/accept-existing` / `decline`) and is moved
+  into the family in one tap, with consent — no link. Owner can revoke
 - **Statistics** — `GET /stats/monthly` (per-month income/expense) + `GET /stats/by-category`
   (totals per category); both scope-aware (personal / family)
 - **Profile & account deletion** — `PATCH /auth/me` (display name + phone); `DELETE /auth/me`
   self-service deletion (Google Play policy): soft-delete now + scheduled 30-day purge.
   Owners must transfer ownership before deleting (sole owners tear down the whole family)
-- **Wallets** — **family** (shared) or **personal** (private to creator); create / list / get /
-  **delete** (cascades its transactions); balance is **derived**, never stored. `?scope=` filters
-- **Categories** — family-scoped income/expense labels (emoji + colour) for tagging transactions
+- **Wallets** — **family** (shared) or **personal** (private to creator), each with an optional
+  **icon + colour**; create / list / get / **edit** (`PATCH /wallets/{rid}` — rename/icon/colour) /
+  **delete** (cascades its transactions); balance is **derived**, never stored. `?scope=` filters.
+  Edit a family wallet as the owner, a personal wallet as its owner
+- **Categories** — family-scoped income/expense labels (emoji + colour) for tagging transactions;
+  rename + change icon/colour (`PATCH /categories/{rid}`)
 - **Transactions** — expense / income; positive integer đồng; optional category; family-scoped.
   Create / list (filter by `type`, `category_rid`, `date_from/to`) / **edit** / **delete**
 - **Budgets** — per-category **monthly limit** with current-month spend (`GET/POST/PATCH/DELETE /budgets`)

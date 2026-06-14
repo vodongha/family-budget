@@ -35,7 +35,7 @@ _NOT_OWNER = HTTPException(
     "",
     response_model=InvitationRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Invite someone (owner-only)",
+    summary="Invite someone",
 )
 def create_invitation(
     payload: InvitationCreate,
@@ -43,15 +43,14 @@ def create_invitation(
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> InvitationRead:
-    """Invite by email or phone. If the contact already has an account the invite
-    is delivered **in-app** (`in_app: true`, no link); otherwise a shareable
-    registration link is created. Owner-only (`403`)."""
+    """Invite by email or phone. Any family member can invite (the new member
+    joins with the `member` role). If the contact already has an account the
+    invite is delivered **in-app** (`in_app: true`, no link); otherwise a
+    shareable registration link is created."""
     try:
         invitation = InvitationService(session).create(
             current_user, family_id, payload.email, payload.phone, payload.role
         )
-    except NotOwnerError:
-        raise _NOT_OWNER from None
     except EmailAlreadyRegisteredError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Email already registered"

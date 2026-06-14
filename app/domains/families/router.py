@@ -4,8 +4,15 @@ transferring ownership is owner-only."""
 from fastapi import APIRouter, HTTPException, status
 
 from app.core.deps import CurrentFamily, CurrentUser, SessionDep
-from app.domains.families.schemas import MemberRead, TransferOwnershipRequest
+from app.core.security import create_access_token
+from app.domains.auth.schemas import Token
+from app.domains.families.schemas import (
+    CreateFamilyRequest,
+    MemberRead,
+    TransferOwnershipRequest,
+)
 from app.domains.families.service import (
+    AlreadyInFamilyError,
     CannotTransferToSelfError,
     FamilyService,
     MemberNotFoundError,
@@ -13,6 +20,35 @@ from app.domains.families.service import (
 )
 
 router = APIRouter(tags=["family"])
+
+
+@router.post(
+    "/families",
+    response_model=Token,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create my family",
+)
+def create_family(
+    payload: CreateFamilyRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> Token:
+    """Create a family for the signed-in account and make it the **owner**
+    (seeding default categories). For an account with no family yet — e.g. just
+    after registering or a first Google sign-in. Returns a fresh JWT carrying the
+    new family scope. `409` if you already belong to a family."""
+    try:
+        user = FamilyService(session).create_family(current_user, payload.name.strip())
+    except AlreadyInFamilyError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already belong to a family",
+        ) from None
+    return Token(
+        access_token=create_access_token(
+            subject=user.rid, extra={"family_id": user.family_id}
+        )
+    )
 
 
 @router.get(

@@ -40,6 +40,10 @@ class Wallet(Base):
     rid: Mapped[str] = mapped_column(String(26), unique=True, default=new_rid)
     family_id: Mapped[int] = mapped_column(ForeignKey("families.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
+    # Optional presentation: an emoji/icon key and a hex colour (e.g. "#5B5BF0").
+    # Null falls back to a default icon/colour in the client.
+    icon: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # "family" (shared) or "personal" (private to owner_user_id).
     visibility: Mapped[str] = mapped_column(
         String(10),

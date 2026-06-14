@@ -11,6 +11,17 @@ class WalletCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     # "family" (shared, default) or "personal" (private to the creator).
     visibility: WalletVisibility = WalletVisibility.FAMILY
+    icon: str | None = Field(default=None, max_length=32)
+    color: str | None = Field(default=None, max_length=16)
+
+
+class WalletUpdate(BaseModel):
+    """Editable wallet fields. Only the provided fields change; visibility is
+    immutable (changing it would move data across the privacy boundary)."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    icon: str | None = Field(default=None, max_length=32)
+    color: str | None = Field(default=None, max_length=16)
 
 
 class WalletDeleteResult(BaseModel):
@@ -22,6 +33,8 @@ class WalletRead(BaseModel):
 
     rid: str
     name: str
+    icon: str | None = None
+    color: str | None = None
     # "family" (shared) or "personal" (private to its owner).
     visibility: WalletVisibility
     # Derived balance in integer minor units (đồng). Can be negative.

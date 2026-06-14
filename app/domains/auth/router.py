@@ -8,6 +8,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.core.deps import CurrentUser, SessionDep
 from app.core.google import GoogleAuthError
 from app.domains.auth.schemas import (
+    ChangePasswordRequest,
     GoogleLoginRequest,
     RegisterRequest,
     Token,
@@ -39,11 +40,13 @@ _PHONE_TAKEN = HTTPException(
     "/register",
     response_model=UserRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Register a new family + owner",
+    summary="Register a new account",
 )
 def register(payload: RegisterRequest, session: SessionDep) -> UserRead:
-    """Create a new family and its first user (the **owner**). Does not log you
-    in — call `POST /auth/login` afterwards. Phone is optional (E.164)."""
+    """Create a new account. Does not log you in — call `POST /auth/login`
+    afterwards. The account has **no family** until it creates one
+    (`POST /families`) or accepts an invitation; pass `family_name` to create a
+    family and own it in one step. Phone is optional (E.164)."""
     service = AuthService(session)
     try:
         user = service.register(
@@ -121,6 +124,32 @@ def update_me(
     except PhoneAlreadyInUseError:
         raise _PHONE_TAKEN from None
     return UserRead.model_validate(user)
+
+
+@router.post(
+    "/change-password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Change or set my password",
+)
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> Response:
+    """Change the account password (`current_password` must match), or set the
+    first password for a Google-only account (omit `current_password`). `400` if
+    the current password is missing or wrong."""
+    service = AuthService(session)
+    try:
+        service.change_password(
+            current_user, payload.current_password, payload.new_password
+        )
+    except InvalidCredentialsError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        ) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete(

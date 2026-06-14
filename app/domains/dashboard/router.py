@@ -36,6 +36,8 @@ def summary(
             WalletRead(
                 rid=wallet.rid,
                 name=wallet.name,
+                icon=wallet.icon,
+                color=wallet.color,
                 visibility=wallet.visibility,  # type: ignore[arg-type]
                 balance=balance,
                 txn_count=count,

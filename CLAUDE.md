@@ -166,7 +166,9 @@ layout and is scoped by `get_current_family`.
 
 ### Invitations to existing accounts
 
-`POST /invitations` matches the email/phone to an existing account (`invitations.target_user_id`).
+**Any active family member can invite** (not just the owner); the invitee always joins with the
+`member` role (a non-owner inviter can't grant a higher role). `POST /invitations` matches the
+email/phone to an existing account (`invitations.target_user_id`).
 A match becomes an **in-app invite** (no registration link): the invitee reads `GET /invitations/inbox`
 and accepts via `POST /invitations/{rid}/accept-existing`, which moves them into the family
 (their now-empty old family is soft-deleted; an owner with other members gets `409` — transfer
@@ -184,10 +186,26 @@ is acceptable. Tighten to specific origins for production.
 `POST /auth/google` accepts a Google **ID token** from the client and verifies it with
 `google-auth` (`app/core/google.py`, isolated so tests can mock it). The token's audience
 must be one of `settings.google_client_id` (comma-separated to allow web + Android + iOS
-client IDs). It then links the Google `sub` to an existing user with the same email, or
-creates a new family + owner. Google-only accounts have an **empty password hash** and can't
-password-login; deleting an account clears `google_sub` (unlink). Set `GOOGLE_CLIENT_ID` in
-the environment to enable it.
+client IDs). It then links the Google `sub` to an existing user with the same email
+(**matched case-insensitively** via `func.lower` — Google returns a lowercased email, so the
+same person stays one account), or creates a brand-new account with **no family** (it
+creates/joins one after first sign-in, like password registration). Google-only accounts have
+an **empty password hash** and can't password-login (until they set one via
+`POST /auth/change-password`); deleting an account clears `google_sub` (unlink). Set
+`GOOGLE_CLIENT_ID` in the environment to enable it.
+
+### Accounts, families & passwords
+
+Registration creates an **account**, not necessarily a family: `RegisterRequest.family_name`
+is **optional**. Omitted → the account has no family yet (`users.family_id` is nullable;
+`UserRead.has_family` is false) and the client routes it to onboarding to **create or join**
+one. Supplied → a family is created and the registrant owns it (back-compat / one-step path).
+`POST /families` creates a family for the signed-in family-less account, makes it the owner,
+seeds default categories, and returns a **fresh JWT** carrying the new family scope (`409` if
+it already has a family). `POST /auth/change-password` changes the password (`current_password`
+required) — or sets the first password for a Google-only account (omit `current_password`);
+`UserRead.has_password` tells the client which. Emails are stored lowercased and looked up
+case-insensitively (`AuthRepository.get_user_by_email`).
 
 ### Wallet privacy (personal vs family)
 
@@ -206,6 +224,9 @@ endpoints — each constrains its transaction/balance aggregation to the caller'
 visible wallet ids. **Delete:** a personal wallet by its owner; a shared family
 wallet only by the family owner (`403` otherwise). New wallets default to family;
 `POST /wallets {visibility: "personal"}` makes a private one (owner = creator).
+Each wallet also carries an optional **`icon`** (emoji) and **`color`** (hex). `PATCH
+/wallets/{rid}` edits name/icon/color with the **same permission as delete** (family wallet →
+family owner, personal wallet → its owner); visibility is immutable.
 
 ### Privacy policy (`app/domains/legal/`)
 
