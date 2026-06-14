@@ -142,11 +142,13 @@ app = FastAPI(
 )
 
 # CORS — the Flutter web client runs on a different origin and calls this API
-# from the browser. Auth uses a Bearer token (no cookies), so allowing all
-# origins is safe here; tighten to specific origins for production.
+# from the browser. Auth uses a Bearer token (no cookies). Origins are
+# configurable via CORS_ORIGINS (comma-separated); defaults to "*" until a fixed
+# web domain exists. Native mobile apps don't send an Origin header, so this only
+# affects the browser client.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origin_list,
     allow_methods=["*"],
     allow_headers=["*"],
 )

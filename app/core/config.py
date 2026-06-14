@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     env: str = "development"
 
+    # CORS — comma-separated allowed origins for the browser (web) client.
+    # "*" allows any origin (fine while there's no fixed web domain); set this to
+    # the real web origin(s) in production, e.g. "https://app.famo.io.vn".
+    cors_origins: str = "*"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
 
 @lru_cache
 def get_settings() -> Settings:
