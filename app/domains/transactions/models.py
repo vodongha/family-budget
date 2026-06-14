@@ -13,7 +13,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.domains.categories.models import Category
-from app.domains.users.models import new_rid
+from app.domains.users.models import User, new_rid
 from app.domains.wallets.models import Wallet
 
 
@@ -55,3 +55,4 @@ class Transaction(Base):
 
     wallet: Mapped[Wallet] = relationship()
     category: Mapped[Category | None] = relationship()
+    creator: Mapped[User] = relationship(foreign_keys=[created_by_user_id])

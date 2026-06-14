@@ -10,10 +10,12 @@ from app.domains.categories.service import CategoryNotFoundError
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.schemas import (
     TransactionCreate,
+    TransactionCreator,
     TransactionRead,
     TransactionUpdate,
 )
 from app.domains.transactions.service import (
+    NotTransactionOwnerError,
     TransactionNotFoundError,
     TransactionService,
 )
@@ -31,9 +33,13 @@ _WALLET_NOT_FOUND = HTTPException(
 _CATEGORY_NOT_FOUND = HTTPException(
     status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
 )
+_NOT_OWNER = HTTPException(
+    status_code=status.HTTP_403_FORBIDDEN,
+    detail="You can only edit or delete transactions you created",
+)
 
 
-def _to_read(transaction: Transaction) -> TransactionRead:
+def _to_read(transaction: Transaction, current_user_id: int) -> TransactionRead:
     return TransactionRead(
         rid=transaction.rid,
         wallet_rid=transaction.wallet.rid,
@@ -46,6 +52,11 @@ def _to_read(transaction: Transaction) -> TransactionRead:
             if transaction.category is not None
             else None
         ),
+        created_by=TransactionCreator(
+            rid=transaction.creator.rid,
+            display_name=transaction.creator.display_name,
+        ),
+        can_edit=transaction.created_by_user_id == current_user_id,
         created_at=transaction.created_at,
     )
 
@@ -76,7 +87,7 @@ def create_transaction(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
         ) from None
-    return _to_read(transaction)
+    return _to_read(transaction, current_user.id)
 
 
 @router.get("", response_model=list[TransactionRead])
@@ -108,7 +119,7 @@ def list_transactions(
         raise _WALLET_NOT_FOUND from None
     except CategoryNotFoundError:
         raise _CATEGORY_NOT_FOUND from None
-    return [_to_read(transaction) for transaction in transactions]
+    return [_to_read(transaction, current_user.id) for transaction in transactions]
 
 
 @router.patch("/{rid}", response_model=TransactionRead)
@@ -133,11 +144,13 @@ def update_transaction(
         )
     except TransactionNotFoundError:
         raise _TXN_NOT_FOUND from None
+    except NotTransactionOwnerError:
+        raise _NOT_OWNER from None
     except WalletNotFoundError:
         raise _WALLET_NOT_FOUND from None
     except CategoryNotFoundError:
         raise _CATEGORY_NOT_FOUND from None
-    return _to_read(transaction)
+    return _to_read(transaction, current_user.id)
 
 
 @router.delete("/{rid}", status_code=status.HTTP_204_NO_CONTENT)
@@ -151,4 +164,6 @@ def delete_transaction(
         TransactionService(session).delete(family_id, current_user.id, rid)
     except TransactionNotFoundError:
         raise _TXN_NOT_FOUND from None
+    except NotTransactionOwnerError:
+        raise _NOT_OWNER from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
