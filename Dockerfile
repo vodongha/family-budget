@@ -6,6 +6,10 @@ FROM ghcr.io/cirruslabs/flutter:stable AS web
 WORKDIR /src
 ARG API_BASE_URL=https://famo.io.vn
 ARG GOOGLE_CLIENT_ID=692858320760-0n5vkifgkqjoktqigpsjrhr8jqphjdka.apps.googleusercontent.com
+# Bust the Docker layer cache whenever the frontend's master moves: this URL's
+# JSON changes on every new commit, so the clone + web build below rebuild only
+# when the frontend actually changed (and not otherwise).
+ADD https://api.github.com/repos/vodongha/family-budget-app/commits/master /tmp/frontend-commit.json
 RUN git clone --depth 1 https://github.com/vodongha/family-budget-app.git .
 # Platform folders aren't committed in that repo — generate web/, then build.
 RUN flutter create . --platforms=web \
