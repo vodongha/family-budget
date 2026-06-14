@@ -30,7 +30,7 @@ class TransactionService:
 
     def create(
         self,
-        family_id: int,
+        family_id: int | None,
         user_id: int,
         wallet_rid: str,
         type_: TransactionType,
@@ -44,14 +44,10 @@ class TransactionService:
         wallet = self._wallets.get_visible_by_rid(family_id, user_id, wallet_rid)
         if wallet is None:
             raise WalletNotFoundError(wallet_rid)
-        category_id: int | None = None
-        if category_rid is not None:
-            category = self._categories.get_by_rid(family_id, category_rid)
-            if category is None:
-                raise CategoryNotFoundError(category_rid)
-            category_id = category.id
+        category_id = self._resolve_category_id(family_id, category_rid)
         transaction = self._repo.add(
-            family_id=family_id,
+            # Mirror the wallet's family (null for a personal wallet).
+            family_id=wallet.family_id,
             wallet_id=wallet.id,
             created_by_user_id=user_id,
             type_=type_,
@@ -64,9 +60,11 @@ class TransactionService:
         return transaction
 
     def _resolve_category_id(
-        self, family_id: int, category_rid: str | None
+        self, family_id: int | None, category_rid: str | None
     ) -> int | None:
-        if category_rid is None:
+        # Categories are family-scoped; a family-less caller has none, so any
+        # category is ignored rather than raising.
+        if category_rid is None or family_id is None:
             return None
         category = self._categories.get_by_rid(family_id, category_rid)
         if category is None:
@@ -75,7 +73,7 @@ class TransactionService:
 
     def list(
         self,
-        family_id: int,
+        family_id: int | None,
         user_id: int,
         wallet_rid: str | None = None,
         scope: str = WalletScope.ALL.value,
@@ -99,14 +97,14 @@ class TransactionService:
             wallet = self._wallets.get_visible_by_rid(family_id, user_id, wallet_rid)
             if wallet is None:
                 raise WalletNotFoundError(wallet_rid)
-            return self._repo.list(family_id, wallet_id=wallet.id, **filters)
+            return self._repo.list(wallet_id=wallet.id, **filters)
         # Otherwise: only transactions in wallets the caller may see (per scope).
         ids = self._wallets.visible_wallet_ids(family_id, user_id, scope)
-        return self._repo.list(family_id, wallet_ids=ids, **filters)
+        return self._repo.list(wallet_ids=ids, **filters)
 
     def update(
         self,
-        family_id: int,
+        family_id: int | None,
         user_id: int,
         rid: str,
         wallet_rid: str,
@@ -116,7 +114,7 @@ class TransactionService:
         occurred_on: date | None,
         category_rid: str | None = None,
     ) -> Transaction:
-        transaction = self._repo.get_by_rid(family_id, rid)
+        transaction = self._repo.get_by_rid(rid)
         # Must exist and live in a wallet the caller may see (privacy guard).
         if transaction is None or (
             self._wallets.get_visible_by_rid(
@@ -140,8 +138,8 @@ class TransactionService:
         self._session.refresh(transaction)
         return transaction
 
-    def delete(self, family_id: int, user_id: int, rid: str) -> None:
-        transaction = self._repo.get_by_rid(family_id, rid)
+    def delete(self, family_id: int | None, user_id: int, rid: str) -> None:
+        transaction = self._repo.get_by_rid(rid)
         if transaction is None or (
             self._wallets.get_visible_by_rid(
                 family_id, user_id, transaction.wallet.rid

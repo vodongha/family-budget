@@ -22,10 +22,12 @@ class Settings(BaseSettings):
     # client IDs at once. Empty disables Google login.
     google_client_id: str = ""
 
-    # JWT
+    # JWT. The session is meant to last until the user explicitly logs out, so the
+    # access token is long-lived (~10 years). The app still drops the token and
+    # returns to login on any 401.
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60
+    access_token_expire_minutes: int = 60 * 24 * 365 * 10
 
     # Infra
     redis_url: str = "redis://redis:6379/0"

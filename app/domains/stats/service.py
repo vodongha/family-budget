@@ -59,7 +59,7 @@ class StatsService:
 
     def monthly(
         self,
-        family_id: int,
+        family_id: int | None,
         user_id: int,
         months: int,
         scope: str = WalletScope.ALL.value,
@@ -72,9 +72,7 @@ class StatsService:
 
         income: dict[tuple[int, int], int] = {k: 0 for k in window}
         expense: dict[tuple[int, int], int] = {k: 0 for k in window}
-        for occurred_on, type_, amount in self._repo.rows_since(
-            family_id, start, wallet_ids
-        ):
+        for occurred_on, type_, amount in self._repo.rows_since(start, wallet_ids):
             key = (occurred_on.year, occurred_on.month)
             if key not in income:
                 continue
@@ -92,7 +90,7 @@ class StatsService:
 
     def by_category(
         self,
-        family_id: int,
+        family_id: int | None,
         user_id: int,
         kind: str,
         months: int,
@@ -111,7 +109,7 @@ class StatsService:
         # Keyed by category_rid (None for uncategorized). Value carries the
         # running total plus the category's display metadata.
         buckets: dict[str | None, CategorySlice] = {}
-        for row in self._repo.category_rows_since(family_id, start, wallet_ids):
+        for row in self._repo.category_rows_since(start, wallet_ids):
             if row.type != kind:
                 continue
             slice_ = buckets.get(row.category_rid)

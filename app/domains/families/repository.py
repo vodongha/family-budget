@@ -1,9 +1,14 @@
 """DB access for family membership. Always scoped by ``family_id``."""
 
-from sqlalchemy import false, select
+from sqlalchemy import delete, false, select
 from sqlalchemy.orm import Session
 
-from app.domains.users.models import User
+from app.domains.budgets.models import Budget
+from app.domains.categories.models import Category
+from app.domains.invitations.models import Invitation
+from app.domains.transactions.models import Transaction
+from app.domains.users.models import Family, User
+from app.domains.wallets.models import Wallet
 
 
 class FamilyRepository:
@@ -25,3 +30,18 @@ class FamilyRepository:
             User.is_deleted == false(),
         )
         return self._session.scalar(stmt)
+
+    def purge_family(self, family_id: int) -> None:
+        """Hard-delete a family and all its **shared** data, children first to
+        satisfy FKs. Personal wallets/transactions (``family_id`` null) are not
+        touched. Members are detached by the caller; the caller commits."""
+        self._session.execute(
+            delete(Transaction).where(Transaction.family_id == family_id)
+        )
+        self._session.execute(delete(Budget).where(Budget.family_id == family_id))
+        self._session.execute(delete(Category).where(Category.family_id == family_id))
+        self._session.execute(delete(Wallet).where(Wallet.family_id == family_id))
+        self._session.execute(
+            delete(Invitation).where(Invitation.family_id == family_id)
+        )
+        self._session.execute(delete(Family).where(Family.id == family_id))

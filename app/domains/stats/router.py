@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.core.deps import CurrentFamily, CurrentUser, SessionDep
+from app.core.deps import CurrentUser, OptionalFamily, SessionDep
 from app.domains.categories.models import CategoryKind
 from app.domains.stats.schemas import CategorySlice, MonthlyPoint
 from app.domains.stats.service import StatsService
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 )
 def monthly(
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
     months: int = 6,
     scope: WalletScope = WalletScope.ALL,
@@ -41,7 +41,7 @@ def monthly(
 )
 def by_category(
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
     kind: CategoryKind = CategoryKind.EXPENSE,
     months: int = 6,

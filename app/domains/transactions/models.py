@@ -32,7 +32,12 @@ class Transaction(Base):
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     rid: Mapped[str] = mapped_column(String(26), unique=True, default=new_rid)
-    family_id: Mapped[int] = mapped_column(ForeignKey("families.id"), index=True)
+    # Mirrors the wallet's family_id: null for personal-wallet transactions
+    # (owned via the wallet's owner_user_id), set for family-wallet transactions.
+    # Queries scope by wallet_id (which already encodes visibility), not this.
+    family_id: Mapped[int | None] = mapped_column(
+        ForeignKey("families.id"), index=True, nullable=True
+    )
     wallet_id: Mapped[int] = mapped_column(ForeignKey("wallets.id"), index=True)
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     # Stores a TransactionType value ("expense" / "income").

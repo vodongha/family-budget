@@ -9,6 +9,14 @@ class CreateFamilyRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
 
 
+class FamilyUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class FamilyRead(BaseModel):
+    name: str
+
+
 class MemberRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -4,7 +4,7 @@ from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
-from app.core.deps import CurrentFamily, CurrentUser, SessionDep
+from app.core.deps import CurrentUser, OptionalFamily, SessionDep
 from app.domains.categories.schemas import CategoryRead
 from app.domains.categories.service import CategoryNotFoundError
 from app.domains.transactions.models import Transaction, TransactionType
@@ -70,7 +70,7 @@ def _to_read(transaction: Transaction, current_user_id: int) -> TransactionRead:
 def create_transaction(
     payload: TransactionCreate,
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
 ) -> TransactionRead:
     """Record an income or expense in a wallet you can see. `amount` is positive
@@ -101,7 +101,7 @@ def create_transaction(
 @router.get("", response_model=list[TransactionRead], summary="List transactions")
 def list_transactions(
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
     wallet_rid: str | None = Query(default=None),
     scope: WalletScope = WalletScope.ALL,
@@ -138,7 +138,7 @@ def update_transaction(
     rid: str,
     payload: TransactionUpdate,
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
 ) -> TransactionRead:
     """Full update of a transaction. Only its creator may edit it (`403`
@@ -174,7 +174,7 @@ def update_transaction(
 def delete_transaction(
     rid: str,
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
 ) -> Response:
     """Delete a transaction. Only its creator may delete it (`403` otherwise);

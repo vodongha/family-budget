@@ -38,7 +38,12 @@ class Wallet(Base):
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     rid: Mapped[str] = mapped_column(String(26), unique=True, default=new_rid)
-    family_id: Mapped[int] = mapped_column(ForeignKey("families.id"), index=True)
+    # Null for a personal wallet that belongs to a user with no family (and for
+    # personal wallets in general — personal data is owned by ``owner_user_id``,
+    # independent of any family). Family (shared) wallets always set it.
+    family_id: Mapped[int | None] = mapped_column(
+        ForeignKey("families.id"), index=True, nullable=True
+    )
     name: Mapped[str] = mapped_column(String(120))
     # Optional presentation: an emoji/icon key and a hex colour (e.g. "#5B5BF0").
     # Null falls back to a default icon/colour in the client.

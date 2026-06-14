@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.core.deps import CurrentFamily, CurrentUser, SessionDep
+from app.core.deps import CurrentUser, OptionalFamily, SessionDep
 from app.domains.users.models import UserRole
 from app.domains.wallets.models import Wallet, WalletScope
 from app.domains.wallets.schemas import (
@@ -12,6 +12,7 @@ from app.domains.wallets.schemas import (
     WalletUpdate,
 )
 from app.domains.wallets.service import (
+    WalletFamilyRequiredError,
     WalletNotFoundError,
     WalletPermissionError,
     WalletService,
@@ -42,19 +43,26 @@ def _to_read(wallet: Wallet, balance: int, txn_count: int = 0) -> WalletRead:
 def create_wallet(
     payload: WalletCreate,
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
 ) -> WalletRead:
     """Create a `family` (shared) or `personal` (private to you) wallet. Defaults
-    to family."""
-    wallet, balance, count = WalletService(session).create(
-        family_id,
-        current_user.id,
-        payload.name,
-        payload.visibility.value,
-        payload.icon,
-        payload.color,
-    )
+    to family. A `personal` wallet works without a family; a `family` wallet
+    requires one (`400` otherwise)."""
+    try:
+        wallet, balance, count = WalletService(session).create(
+            family_id,
+            current_user.id,
+            payload.name,
+            payload.visibility.value,
+            payload.icon,
+            payload.color,
+        )
+    except WalletFamilyRequiredError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Create a family before adding a shared wallet",
+        ) from None
     return _to_read(wallet, balance, count)
 
 
@@ -63,7 +71,7 @@ def update_wallet(
     rid: str,
     payload: WalletUpdate,
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
 ) -> WalletRead:
     """Rename a wallet or change its icon/colour. A personal wallet can be edited
@@ -95,7 +103,7 @@ def update_wallet(
 @router.get("", response_model=list[WalletRead], summary="List wallets")
 def list_wallets(
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
     scope: WalletScope = WalletScope.ALL,
 ) -> list[WalletRead]:
@@ -113,7 +121,7 @@ def list_wallets(
 def get_wallet(
     rid: str,
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
 ) -> WalletRead:
     """One wallet by `rid` with its balance. `404` if it isn't visible to you
@@ -137,7 +145,7 @@ def get_wallet(
 def delete_wallet(
     rid: str,
     session: SessionDep,
-    family_id: CurrentFamily,
+    family_id: OptionalFamily,
     current_user: CurrentUser,
 ) -> WalletDeleteResult:
     """Delete a wallet and all of its transactions. A personal wallet can be

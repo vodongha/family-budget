@@ -9,7 +9,7 @@ filter can't be forgotten at a call site.
 # annotations on later methods must stay lazy.
 from __future__ import annotations
 
-from sqlalchemy import and_, case, delete, func, or_, select
+from sqlalchemy import and_, case, delete, false, func, or_, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -31,27 +31,35 @@ _SIGNED_AMOUNT = case(
 
 
 def visibility_clause(
-    family_id: int, user_id: int, scope: str
+    family_id: int | None, user_id: int, scope: str
 ) -> ColumnElement[bool]:
     """The WHERE clause for wallets the caller may see under ``scope``.
 
-    - ``family``  → shared wallets only.
-    - ``personal``→ the caller's own personal wallets only.
+    - ``family``  → shared wallets of ``family_id`` (none when it's ``None``).
+    - ``personal``→ the caller's own personal wallets (independent of any family).
     - ``all``     → shared wallets plus the caller's own personal wallets.
 
-    A personal wallet owned by someone else is never matched.
+    A personal wallet owned by someone else is never matched. Personal wallets are
+    owned by ``owner_user_id`` and don't depend on a family, so a user with no
+    family still sees their personal wallets.
     """
-    base = Wallet.family_id == family_id
-    family_only = Wallet.visibility == WalletVisibility.FAMILY.value
+    family_only: ColumnElement[bool] = (
+        and_(
+            Wallet.family_id == family_id,
+            Wallet.visibility == WalletVisibility.FAMILY.value,
+        )
+        if family_id is not None
+        else false()
+    )
     own_personal = and_(
         Wallet.visibility == WalletVisibility.PERSONAL.value,
         Wallet.owner_user_id == user_id,
     )
     if scope == WalletScope.FAMILY.value:
-        return and_(base, family_only)
+        return family_only
     if scope == WalletScope.PERSONAL.value:
-        return and_(base, own_personal)
-    return and_(base, or_(family_only, own_personal))
+        return own_personal
+    return or_(family_only, own_personal)
 
 
 class WalletRepository:
@@ -60,7 +68,7 @@ class WalletRepository:
 
     def add(
         self,
-        family_id: int,
+        family_id: int | None,
         name: str,
         visibility: str = WalletVisibility.FAMILY.value,
         owner_user_id: int | None = None,
@@ -79,7 +87,7 @@ class WalletRepository:
         self._session.flush()
         return wallet
 
-    def list(self, family_id: int, user_id: int, scope: str) -> list[Wallet]:
+    def list(self, family_id: int | None, user_id: int, scope: str) -> list[Wallet]:
         stmt = (
             select(Wallet)
             .where(visibility_clause(family_id, user_id, scope))
@@ -88,19 +96,15 @@ class WalletRepository:
         return list(self._session.scalars(stmt).all())
 
     def visible_wallet_ids(
-        self, family_id: int, user_id: int, scope: str
+        self, family_id: int | None, user_id: int, scope: str
     ) -> list[int]:
         """The ids of wallets the caller may see — used to scope transaction,
         balance, and statistics queries to those wallets."""
         stmt = select(Wallet.id).where(visibility_clause(family_id, user_id, scope))
         return list(self._session.scalars(stmt).all())
 
-    def get_by_rid(self, family_id: int, rid: str) -> Wallet | None:
-        stmt = select(Wallet).where(Wallet.family_id == family_id, Wallet.rid == rid)
-        return self._session.scalar(stmt)
-
     def get_visible_by_rid(
-        self, family_id: int, user_id: int, rid: str
+        self, family_id: int | None, user_id: int, rid: str
     ) -> Wallet | None:
         """A wallet by rid, but only if the caller is allowed to see it
         (returns None for another member's personal wallet — no existence leak)."""
@@ -110,58 +114,42 @@ class WalletRepository:
         )
         return self._session.scalar(stmt)
 
-    def balances_by_wallet(
-        self, family_id: int, wallet_ids: list[int]
-    ) -> dict[int, int]:
-        """Net balance per wallet_id, restricted to ``wallet_ids``. Wallets with
-        no transactions are absent (→ 0)."""
+    def balances_by_wallet(self, wallet_ids: list[int]) -> dict[int, int]:
+        """Net balance per wallet_id, restricted to ``wallet_ids`` (which already
+        encode visibility, so no family filter is needed). Wallets with no
+        transactions are absent (→ 0)."""
         if not wallet_ids:
             return {}
         stmt = (
             select(Transaction.wallet_id, func.sum(_SIGNED_AMOUNT))
-            .where(
-                Transaction.family_id == family_id,
-                Transaction.wallet_id.in_(wallet_ids),
-            )
+            .where(Transaction.wallet_id.in_(wallet_ids))
             .group_by(Transaction.wallet_id)
         )
         return {wallet_id: int(total) for wallet_id, total in self._session.execute(stmt)}
 
-    def balance(self, family_id: int, wallet_id: int) -> int:
+    def balance(self, wallet_id: int) -> int:
         stmt = select(func.coalesce(func.sum(_SIGNED_AMOUNT), 0)).where(
-            Transaction.family_id == family_id,
             Transaction.wallet_id == wallet_id,
         )
         return int(self._session.scalar(stmt) or 0)
 
-    def counts_by_wallet(
-        self, family_id: int, wallet_ids: list[int]
-    ) -> dict[int, int]:
+    def counts_by_wallet(self, wallet_ids: list[int]) -> dict[int, int]:
         """Transaction count per wallet_id, restricted to ``wallet_ids`` (absent → 0)."""
         if not wallet_ids:
             return {}
         stmt = (
             select(Transaction.wallet_id, func.count())
-            .where(
-                Transaction.family_id == family_id,
-                Transaction.wallet_id.in_(wallet_ids),
-            )
+            .where(Transaction.wallet_id.in_(wallet_ids))
             .group_by(Transaction.wallet_id)
         )
         return {wallet_id: int(n) for wallet_id, n in self._session.execute(stmt)}
 
-    def delete_with_transactions(self, family_id: int, wallet_id: int) -> int:
-        """Delete the wallet's transactions then the wallet. Returns the number of
-        transactions removed. Caller commits."""
+    def delete_with_transactions(self, wallet_id: int) -> int:
+        """Delete the wallet's transactions then the wallet (the wallet was already
+        permission-checked by the caller). Returns the number of transactions
+        removed. Caller commits."""
         deleted = self._session.execute(
-            delete(Transaction).where(
-                Transaction.family_id == family_id,
-                Transaction.wallet_id == wallet_id,
-            )
+            delete(Transaction).where(Transaction.wallet_id == wallet_id)
         ).rowcount
-        self._session.execute(
-            delete(Wallet).where(
-                Wallet.family_id == family_id, Wallet.id == wallet_id
-            )
-        )
+        self._session.execute(delete(Wallet).where(Wallet.id == wallet_id))
         return int(deleted or 0)

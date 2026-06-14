@@ -39,10 +39,10 @@ class StatsRepository:
         self._session = session
 
     def rows_since(
-        self, family_id: int, start: date, wallet_ids: list[int]
+        self, start: date, wallet_ids: list[int]
     ) -> list[tuple[date, str, int]]:
         """(occurred_on, type, amount) from ``start`` onward, restricted to
-        ``wallet_ids`` (the wallets the caller may see).
+        ``wallet_ids`` (which already encode visibility).
 
         Aggregation into month buckets happens in the service (in Python) so the
         query stays portable across Oracle and the SQLite test database.
@@ -52,14 +52,13 @@ class StatsRepository:
         stmt = select(
             Transaction.occurred_on, Transaction.type, Transaction.amount
         ).where(
-            Transaction.family_id == family_id,
             Transaction.occurred_on >= start,
             Transaction.wallet_id.in_(wallet_ids),
         )
         return [(r[0], r[1], r[2]) for r in self._session.execute(stmt).all()]
 
     def category_rows_since(
-        self, family_id: int, start: date, wallet_ids: list[int]
+        self, start: date, wallet_ids: list[int]
     ) -> list[CategoryRow]:
         """Transactions from ``start`` onward (restricted to ``wallet_ids``), each
         with its category metadata.
@@ -81,7 +80,6 @@ class StatsRepository:
             )
             .outerjoin(Category, Transaction.category_id == Category.id)
             .where(
-                Transaction.family_id == family_id,
                 Transaction.occurred_on >= start,
                 Transaction.wallet_id.in_(wallet_ids),
             )

@@ -25,9 +25,14 @@ income/expense together, scoped per family.
   existing account by email (**case-insensitive**, so the same person stays one account); a brand-new
   Google account starts with no family (creates/joins one after sign-in). Google is unlinked on
   account deletion
-- **Roles & members** — `owner` / `member`. `GET /members` lists the family;
-  `POST /families/transfer-ownership` hands ownership to another member (single-owner — the old
-  owner becomes a member)
+- **Personal works without a family** — `wallets`/`transactions` `family_id` is nullable; a
+  **personal** wallet is owned by the user (no family needed). A family is created on demand
+  (`POST /families`); the family scope (shared wallets) requires one. Reads use `OptionalFamily`.
+- **Roles, members & family management** — `owner` / `member`. `GET /members` lists the family;
+  `POST /families/transfer-ownership` hands ownership to another member; `PATCH /families` renames;
+  `DELETE /families` deletes it (owner, sole member — keeps personal data); `POST /families/leave`
+  leaves; `DELETE /families/members/{rid}` removes a member (owner). Membership changes return a
+  fresh JWT
 - **Invitations** — **any family member** invites by **email or phone** (the invitee always joins
   as a member). A new contact gets a public invite link (accept with a chosen password →
   auto-login). A contact that **already has an account** gets an **in-app invite**
