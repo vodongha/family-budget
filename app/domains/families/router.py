@@ -15,21 +15,33 @@ from app.domains.families.service import (
 router = APIRouter(tags=["family"])
 
 
-@router.get("/members", response_model=list[MemberRead])
+@router.get(
+    "/members",
+    response_model=list[MemberRead],
+    summary="List family members",
+)
 def list_members(
     session: SessionDep, family_id: CurrentFamily, current_user: CurrentUser
 ) -> list[MemberRead]:
+    """Active members of your family, each with their role. Open to any member."""
     members = FamilyService(session).list_members(family_id)
     return [MemberRead.model_validate(m) for m in members]
 
 
-@router.post("/families/transfer-ownership", response_model=MemberRead)
+@router.post(
+    "/families/transfer-ownership",
+    response_model=MemberRead,
+    summary="Transfer ownership (owner-only)",
+)
 def transfer_ownership(
     payload: TransferOwnershipRequest,
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> MemberRead:
+    """Hand ownership to another active member; the caller becomes a member
+    (single-owner model). `403` if not the owner, `404` if the target isn't in
+    the family, `400` if you target yourself."""
     try:
         new_owner = FamilyService(session).transfer_ownership(
             current_user, family_id, payload.target_rid

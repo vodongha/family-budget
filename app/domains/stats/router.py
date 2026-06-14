@@ -11,7 +11,11 @@ from app.domains.wallets.models import WalletScope
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
-@router.get("/monthly", response_model=list[MonthlyPoint])
+@router.get(
+    "/monthly",
+    response_model=list[MonthlyPoint],
+    summary="Monthly income/expense series",
+)
 def monthly(
     session: SessionDep,
     family_id: CurrentFamily,
@@ -19,6 +23,8 @@ def monthly(
     months: int = 6,
     scope: WalletScope = WalletScope.ALL,
 ) -> list[MonthlyPoint]:
+    """Income and expense totals per month for the last `months` months, scoped by
+    `scope`. Transfers are excluded."""
     points = StatsService(session).monthly(
         family_id, current_user.id, months, scope.value
     )
@@ -28,7 +34,11 @@ def monthly(
     ]
 
 
-@router.get("/by-category", response_model=list[CategorySlice])
+@router.get(
+    "/by-category",
+    response_model=list[CategorySlice],
+    summary="Per-category breakdown",
+)
 def by_category(
     session: SessionDep,
     family_id: CurrentFamily,
@@ -37,6 +47,8 @@ def by_category(
     months: int = 6,
     scope: WalletScope = WalletScope.ALL,
 ) -> list[CategorySlice]:
+    """Totals per category for one `kind` (`expense`/`income`) over `months`,
+    sorted by amount descending. Uncategorized entries fold into one bucket."""
     slices = StatsService(session).by_category(
         family_id, current_user.id, kind.value, months, scope.value
     )

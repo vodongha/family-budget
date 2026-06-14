@@ -14,13 +14,21 @@ from app.domains.wallets.service import WalletNotFoundError
 router = APIRouter(prefix="/transfers", tags=["transfers"])
 
 
-@router.post("", response_model=TransferRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=TransferRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a transfer",
+)
 def create_transfer(
     payload: TransferCreate,
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> TransferRead:
+    """Move money between two wallets you can see, recorded as two linked legs.
+    `400` if source and destination are the same wallet, `404` if a wallet isn't
+    visible. Excluded from income/expense totals."""
     try:
         group_rid, from_rid, to_rid, amount, on = TransferService(session).create(
             family_id=family_id,
@@ -49,13 +57,18 @@ def create_transfer(
     )
 
 
-@router.delete("/{group_rid}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{group_rid}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a transfer",
+)
 def delete_transfer(
     group_rid: str,
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> Response:
+    """Remove both legs of a transfer by its `group_rid`. `404` if not found."""
     try:
         TransferService(session).delete(family_id, current_user.id, group_rid)
     except TransferNotFoundError:

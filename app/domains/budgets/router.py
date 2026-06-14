@@ -25,21 +25,30 @@ def _to_read(budget: Budget, spent: int) -> BudgetRead:
     )
 
 
-@router.get("", response_model=list[BudgetRead])
+@router.get("", response_model=list[BudgetRead], summary="List budgets")
 def list_budgets(
     session: SessionDep, family_id: CurrentFamily, current_user: CurrentUser
 ) -> list[BudgetRead]:
+    """Each category budget with the current month's `spent` (over family wallets,
+    so personal spending stays private). `spent` is derived, never stored."""
     items = BudgetService(session).list_with_spent(family_id, current_user.id)
     return [_to_read(b, spent) for b, spent in items]
 
 
-@router.post("", response_model=BudgetRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=BudgetRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a budget",
+)
 def create_budget(
     payload: BudgetCreate,
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> BudgetRead:
+    """Set a monthly limit for one category. `404` if the category isn't in your
+    family, `409` if it already has a budget (one per category)."""
     try:
         budget, spent = BudgetService(session).create(
             family_id, current_user.id, payload.category_rid, payload.amount
@@ -56,7 +65,7 @@ def create_budget(
     return _to_read(budget, spent)
 
 
-@router.patch("/{rid}", response_model=BudgetRead)
+@router.patch("/{rid}", response_model=BudgetRead, summary="Update a budget")
 def update_budget(
     rid: str,
     payload: BudgetUpdate,
@@ -64,6 +73,7 @@ def update_budget(
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> BudgetRead:
+    """Change a budget's monthly `amount`. `404` if not in your family."""
     try:
         budget, spent = BudgetService(session).update(
             family_id, current_user.id, rid, payload.amount
@@ -75,10 +85,15 @@ def update_budget(
     return _to_read(budget, spent)
 
 
-@router.delete("/{rid}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{rid}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a budget",
+)
 def delete_budget(
     rid: str, session: SessionDep, family_id: CurrentFamily, current_user: CurrentUser
 ) -> Response:
+    """Remove a category's budget. `404` if not in your family."""
     try:
         BudgetService(session).delete(family_id, rid)
     except BudgetNotFoundError:
