@@ -14,7 +14,12 @@ RUN pip install --upgrade pip && pip install -e .
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
+COPY scripts ./scripts
+RUN chmod +x ./scripts/fly_entrypoint.sh
 
 EXPOSE 8000
 
+# The entrypoint materialises the ADB wallet from secrets (Fly), then runs the
+# process command below (or the per-process command from fly.toml / compose).
+ENTRYPOINT ["./scripts/fly_entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
