@@ -31,13 +31,21 @@ _NOT_OWNER = HTTPException(
 )
 
 
-@router.post("", response_model=InvitationRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=InvitationRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Invite someone (owner-only)",
+)
 def create_invitation(
     payload: InvitationCreate,
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> InvitationRead:
+    """Invite by email or phone. If the contact already has an account the invite
+    is delivered **in-app** (`in_app: true`, no link); otherwise a shareable
+    registration link is created. Owner-only (`403`)."""
     try:
         invitation = InvitationService(session).create(
             current_user, family_id, payload.email, payload.phone, payload.role
@@ -61,7 +69,11 @@ def create_invitation(
     return InvitationRead.model_validate(invitation)
 
 
-@router.get("/inbox", response_model=list[InvitationInboxRead])
+@router.get(
+    "/inbox",
+    response_model=list[InvitationInboxRead],
+    summary="My invitation inbox",
+)
 def list_inbox(session: SessionDep, current_user: CurrentUser) -> list[InvitationInboxRead]:
     """Pending in-app invites addressed to the signed-in account."""
     items = InvitationService(session).inbox(current_user)
@@ -77,10 +89,15 @@ def list_inbox(session: SessionDep, current_user: CurrentUser) -> list[Invitatio
     ]
 
 
-@router.get("", response_model=list[InvitationRead])
+@router.get(
+    "",
+    response_model=list[InvitationRead],
+    summary="List sent invitations (owner-only)",
+)
 def list_invitations(
     session: SessionDep, family_id: CurrentFamily, current_user: CurrentUser
 ) -> list[InvitationRead]:
+    """Invitations your family has sent. Owner-only (`403`)."""
     try:
         invitations = InvitationService(session).list(current_user, family_id)
     except NotOwnerError:
@@ -88,7 +105,11 @@ def list_invitations(
     return [InvitationRead.model_validate(i) for i in invitations]
 
 
-@router.get("/{token}", response_model=InvitationPublic)
+@router.get(
+    "/{token}",
+    response_model=InvitationPublic,
+    summary="Read a public invite (no auth)",
+)
 def get_invitation(token: str, session: SessionDep) -> InvitationPublic:
     """Public: the invite landing page reads this to show the family + whether an
     email is still needed. No auth (the invitee has no account yet)."""
@@ -107,8 +128,15 @@ def get_invitation(token: str, session: SessionDep) -> InvitationPublic:
     )
 
 
-@router.post("/accept", response_model=Token)
+@router.post(
+    "/accept",
+    response_model=Token,
+    summary="Accept an invite as a new user (no auth)",
+)
 def accept_invitation(payload: AcceptInvitation, session: SessionDep) -> Token:
+    """Public: register a brand-new account from an invitation token and join the
+    family. Returns a JWT (auto-login). `422` if an email is required, `409` if
+    the email is already registered."""
     try:
         _user, jwt = InvitationService(session).accept(
             payload.token, payload.password, payload.display_name, payload.email
@@ -130,13 +158,19 @@ def accept_invitation(payload: AcceptInvitation, session: SessionDep) -> Token:
     return Token(access_token=jwt)
 
 
-@router.delete("/{rid}", response_model=InvitationRead)
+@router.delete(
+    "/{rid}",
+    response_model=InvitationRead,
+    summary="Revoke an invitation (owner-only)",
+)
 def revoke_invitation(
     rid: str,
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> InvitationRead:
+    """Cancel a pending invitation you sent. Owner-only (`403`); `404` if not
+    found, `409` if it is no longer pending."""
     try:
         invitation = InvitationService(session).revoke(current_user, family_id, rid)
     except NotOwnerError:
@@ -158,7 +192,11 @@ _INVITE_NOT_FOUND = HTTPException(
 )
 
 
-@router.post("/{rid}/accept-existing", response_model=Token)
+@router.post(
+    "/{rid}/accept-existing",
+    response_model=Token,
+    summary="Accept an in-app invite",
+)
 def accept_existing(
     rid: str, session: SessionDep, current_user: CurrentUser
 ) -> Token:
@@ -179,10 +217,15 @@ def accept_existing(
     return Token(access_token=jwt)
 
 
-@router.post("/{rid}/decline", response_model=InvitationInboxRead)
+@router.post(
+    "/{rid}/decline",
+    response_model=InvitationInboxRead,
+    summary="Decline an in-app invite",
+)
 def decline(
     rid: str, session: SessionDep, current_user: CurrentUser
 ) -> InvitationInboxRead:
+    """Dismiss a pending in-app invite from your inbox. `404` if not found."""
     try:
         invitation = InvitationService(session).decline(current_user, rid)
     except InvitationNotFoundError:

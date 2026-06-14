@@ -26,26 +26,35 @@ def _to_read(wallet: Wallet, balance: int, txn_count: int = 0) -> WalletRead:
     )
 
 
-@router.post("", response_model=WalletRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=WalletRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a wallet",
+)
 def create_wallet(
     payload: WalletCreate,
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> WalletRead:
+    """Create a `family` (shared) or `personal` (private to you) wallet. Defaults
+    to family."""
     wallet, balance, count = WalletService(session).create(
         family_id, current_user.id, payload.name, payload.visibility.value
     )
     return _to_read(wallet, balance, count)
 
 
-@router.get("", response_model=list[WalletRead])
+@router.get("", response_model=list[WalletRead], summary="List wallets")
 def list_wallets(
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
     scope: WalletScope = WalletScope.ALL,
 ) -> list[WalletRead]:
+    """Wallets visible to you with derived balances. `scope`: `all` (family +
+    your personal), `family`, or `personal`."""
     return [
         _to_read(wallet, balance, count)
         for wallet, balance, count in WalletService(session).list_with_balances(
@@ -54,13 +63,15 @@ def list_wallets(
     ]
 
 
-@router.get("/{rid}", response_model=WalletRead)
+@router.get("/{rid}", response_model=WalletRead, summary="Get one wallet")
 def get_wallet(
     rid: str,
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> WalletRead:
+    """One wallet by `rid` with its balance. `404` if it isn't visible to you
+    (a wallet you can't see is indistinguishable from one that doesn't exist)."""
     try:
         wallet, balance, count = WalletService(session).get_with_balance(
             family_id, current_user.id, rid
@@ -72,7 +83,11 @@ def get_wallet(
     return _to_read(wallet, balance, count)
 
 
-@router.delete("/{rid}", response_model=WalletDeleteResult)
+@router.delete(
+    "/{rid}",
+    response_model=WalletDeleteResult,
+    summary="Delete a wallet",
+)
 def delete_wallet(
     rid: str,
     session: SessionDep,

@@ -11,13 +11,19 @@ from app.domains.wallets.schemas import WalletRead
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
-@router.get("/summary", response_model=DashboardSummary)
+@router.get(
+    "/summary",
+    response_model=DashboardSummary,
+    summary="Family overview",
+)
 def summary(
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
     scope: WalletScope = WalletScope.ALL,
 ) -> DashboardSummary:
+    """Net balance, total income/expense and per-wallet balances for the chosen
+    `scope` (`all` / `family` / `personal`). Transfers are excluded from totals."""
     total_income, total_expense, wallets = DashboardService(session).summary(
         family_id, current_user.id, scope.value
     )

@@ -10,8 +10,10 @@ from app.core.deps import SessionDep
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health")
+@router.get("/health", summary="Health check")
 def health(session: SessionDep) -> dict[str, object]:
+    """Probe database connectivity (`SELECT 1`). Returns `status` (`ok`/`degraded`),
+    a `database` boolean, and an `error` string when the check fails. No auth."""
     db_ok = False
     error: str | None = None
     try:

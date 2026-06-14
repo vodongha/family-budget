@@ -61,13 +61,21 @@ def _to_read(transaction: Transaction, current_user_id: int) -> TransactionRead:
     )
 
 
-@router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=TransactionRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a transaction",
+)
 def create_transaction(
     payload: TransactionCreate,
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> TransactionRead:
+    """Record an income or expense in a wallet you can see. `amount` is positive
+    đồng; direction comes from `type`. `404` if the wallet or category isn't
+    visible/found."""
     try:
         transaction = TransactionService(session).create(
             family_id=family_id,
@@ -90,7 +98,7 @@ def create_transaction(
     return _to_read(transaction, current_user.id)
 
 
-@router.get("", response_model=list[TransactionRead])
+@router.get("", response_model=list[TransactionRead], summary="List transactions")
 def list_transactions(
     session: SessionDep,
     family_id: CurrentFamily,
@@ -103,6 +111,9 @@ def list_transactions(
     date_from: date | None = None,
     date_to: date | None = None,
 ) -> list[TransactionRead]:
+    """Transactions newest-first, filterable by `wallet_rid`, `scope`, `type`,
+    `category_rid` and a `date_from`/`date_to` range. Each row carries `created_by`
+    and `can_edit` (true only for entries you created). May include transfer legs."""
     try:
         transactions = TransactionService(session).list(
             family_id,
@@ -122,7 +133,7 @@ def list_transactions(
     return [_to_read(transaction, current_user.id) for transaction in transactions]
 
 
-@router.patch("/{rid}", response_model=TransactionRead)
+@router.patch("/{rid}", response_model=TransactionRead, summary="Edit a transaction")
 def update_transaction(
     rid: str,
     payload: TransactionUpdate,
@@ -130,6 +141,8 @@ def update_transaction(
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> TransactionRead:
+    """Full update of a transaction. Only its creator may edit it (`403`
+    otherwise); `404` if not in your family."""
     try:
         transaction = TransactionService(session).update(
             family_id=family_id,
@@ -153,13 +166,19 @@ def update_transaction(
     return _to_read(transaction, current_user.id)
 
 
-@router.delete("/{rid}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{rid}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a transaction",
+)
 def delete_transaction(
     rid: str,
     session: SessionDep,
     family_id: CurrentFamily,
     current_user: CurrentUser,
 ) -> Response:
+    """Delete a transaction. Only its creator may delete it (`403` otherwise);
+    `404` if not in your family."""
     try:
         TransactionService(session).delete(family_id, current_user.id, rid)
     except TransactionNotFoundError:
