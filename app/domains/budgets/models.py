@@ -31,7 +31,14 @@ class Budget(Base):
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     rid: Mapped[str] = mapped_column(String(26), unique=True, default=new_rid)
-    family_id: Mapped[int] = mapped_column(ForeignKey("families.id"), index=True)
+    # Family (shared, family_id set) or personal (owner_user_id set, family_id
+    # null) — a budget limits spending on a family or a personal category.
+    family_id: Mapped[int | None] = mapped_column(
+        ForeignKey("families.id"), index=True, nullable=True
+    )
+    owner_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
     category_id: Mapped[int] = mapped_column(
         ForeignKey("categories.id"), index=True
     )

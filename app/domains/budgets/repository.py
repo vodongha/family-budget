@@ -1,15 +1,35 @@
-"""DB access for budgets. Always scoped by family_id (tenant boundary)."""
+"""DB access for budgets.
+
+A budget is **family** (shared, ``family_id`` set) or **personal**
+(``owner_user_id`` set, ``family_id`` null). Reads are scoped like wallets:
+``personal`` = the caller's own, ``family`` = the family's.
+"""
 
 # A method named ``list`` shadows the builtin in the class body.
 from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import false, func, or_, select
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.domains.budgets.models import Budget
 from app.domains.transactions.models import Transaction
+
+
+def _scope_clause(
+    family_id: int | None, user_id: int, scope: str
+) -> ColumnElement[bool]:
+    family_only: ColumnElement[bool] = (
+        Budget.family_id == family_id if family_id is not None else false()
+    )
+    own_personal = Budget.owner_user_id == user_id
+    if scope == "family":
+        return family_only
+    if scope == "personal":
+        return own_personal
+    return or_(family_only, own_personal)
 
 
 class BudgetRepository:
@@ -17,10 +37,16 @@ class BudgetRepository:
         self._session = session
 
     def add(
-        self, family_id: int, category_id: int, amount: int, created_by_user_id: int
+        self,
+        family_id: int | None,
+        owner_user_id: int | None,
+        category_id: int,
+        amount: int,
+        created_by_user_id: int,
     ) -> Budget:
         budget = Budget(
             family_id=family_id,
+            owner_user_id=owner_user_id,
             category_id=category_id,
             amount=amount,
             created_by_user_id=created_by_user_id,
@@ -29,26 +55,31 @@ class BudgetRepository:
         self._session.flush()
         return budget
 
-    def list(self, family_id: int) -> list[Budget]:
+    def list(self, family_id: int | None, user_id: int, scope: str) -> list[Budget]:
         stmt = (
             select(Budget)
-            .where(Budget.family_id == family_id)
+            .where(_scope_clause(family_id, user_id, scope))
             .options(selectinload(Budget.category))
             .order_by(Budget.created_at)
         )
         return list(self._session.scalars(stmt).all())
 
-    def get_by_rid(self, family_id: int, rid: str) -> Budget | None:
+    def get_visible_by_rid(
+        self, family_id: int | None, user_id: int, rid: str
+    ) -> Budget | None:
         stmt = (
             select(Budget)
-            .where(Budget.family_id == family_id, Budget.rid == rid)
+            .where(_scope_clause(family_id, user_id, "all"), Budget.rid == rid)
             .options(selectinload(Budget.category))
         )
         return self._session.scalar(stmt)
 
-    def get_by_category(self, family_id: int, category_id: int) -> Budget | None:
+    def get_by_category(
+        self, family_id: int | None, user_id: int, scope: str, category_id: int
+    ) -> Budget | None:
         stmt = select(Budget).where(
-            Budget.family_id == family_id, Budget.category_id == category_id
+            _scope_clause(family_id, user_id, scope),
+            Budget.category_id == category_id,
         )
         return self._session.scalar(stmt)
 
@@ -56,18 +87,18 @@ class BudgetRepository:
         self._session.delete(budget)
 
     def spent_by_category(
-        self, family_id: int, wallet_ids: list[int], start: date, end: date
+        self, wallet_ids: list[int], start: date, end: date
     ) -> dict[int, int]:
-        """Total transacted per category in ``[start, end)`` over ``wallet_ids``.
-
-        Used to compute current-month spending against each budget.
-        """
+        """Total transacted per category in ``[start, end)`` over ``wallet_ids``
+        (which already encode visibility). Used for current-month spending."""
         if not wallet_ids:
             return {}
         stmt = (
-            select(Transaction.category_id, func.coalesce(func.sum(Transaction.amount), 0))
+            select(
+                Transaction.category_id,
+                func.coalesce(func.sum(Transaction.amount), 0),
+            )
             .where(
-                Transaction.family_id == family_id,
                 Transaction.category_id.is_not(None),
                 Transaction.wallet_id.in_(wallet_ids),
                 Transaction.occurred_on >= start,

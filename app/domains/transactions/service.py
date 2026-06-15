@@ -44,7 +44,7 @@ class TransactionService:
         wallet = self._wallets.get_visible_by_rid(family_id, user_id, wallet_rid)
         if wallet is None:
             raise WalletNotFoundError(wallet_rid)
-        category_id = self._resolve_category_id(family_id, category_rid)
+        category_id = self._resolve_category_id(family_id, user_id, category_rid)
         transaction = self._repo.add(
             # Mirror the wallet's family (null for a personal wallet).
             family_id=wallet.family_id,
@@ -60,13 +60,15 @@ class TransactionService:
         return transaction
 
     def _resolve_category_id(
-        self, family_id: int | None, category_rid: str | None
+        self, family_id: int | None, user_id: int, category_rid: str | None
     ) -> int | None:
-        # Categories are family-scoped; a family-less caller has none, so any
-        # category is ignored rather than raising.
-        if category_rid is None or family_id is None:
+        if category_rid is None:
             return None
-        category = self._categories.get_by_rid(family_id, category_rid)
+        # The category must be visible to the caller (their personal one or one
+        # of their family's).
+        category = self._categories.get_visible_by_rid(
+            family_id, user_id, category_rid
+        )
         if category is None:
             raise CategoryNotFoundError(category_rid)
         return category.id
@@ -83,7 +85,7 @@ class TransactionService:
         date_from: date | None = None,
         date_to: date | None = None,
     ) -> list[Transaction]:
-        category_id = self._resolve_category_id(family_id, category_rid)
+        category_id = self._resolve_category_id(family_id, user_id, category_rid)
         type_value = type_.value if type_ is not None else None
         filters = {
             "limit": limit,
@@ -133,7 +135,9 @@ class TransactionService:
         transaction.amount = amount
         transaction.note = note
         transaction.occurred_on = occurred_on or date.today()
-        transaction.category_id = self._resolve_category_id(family_id, category_rid)
+        transaction.category_id = self._resolve_category_id(
+            family_id, user_id, category_rid
+        )
         self._session.commit()
         self._session.refresh(transaction)
         return transaction

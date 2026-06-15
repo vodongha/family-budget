@@ -89,6 +89,10 @@ class AuthService:
             role=role,
             phone=normalized_phone,
         )
+        # Seed the personal category set so the personal space is usable at once.
+        # (When a family was created above it already has its own seeded set.)
+        if family_id is None:
+            self._categories.seed_defaults(owner_user_id=user.id)
         self._session.commit()
         return user
 
@@ -138,6 +142,7 @@ class AuthService:
             role=UserRole.MEMBER,
             google_sub=google_sub,
         )
+        self._categories.seed_defaults(owner_user_id=user.id)
         self._session.commit()
         return user
 

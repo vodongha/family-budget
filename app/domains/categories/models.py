@@ -25,7 +25,14 @@ class Category(Base):
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     rid: Mapped[str] = mapped_column(String(26), unique=True, default=new_rid)
-    family_id: Mapped[int] = mapped_column(ForeignKey("families.id"), index=True)
+    # A category is either **family** (shared, family_id set) or **personal**
+    # (private, owner_user_id set, family_id null) — mirrors wallets.
+    family_id: Mapped[int | None] = mapped_column(
+        ForeignKey("families.id"), index=True, nullable=True
+    )
+    owner_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
     name: Mapped[str] = mapped_column(String(60))
     # An emoji shown as the category's icon (simple, cross-platform, theme-agnostic).
     icon: Mapped[str | None] = mapped_column(String(16), nullable=True)
