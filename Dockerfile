@@ -16,6 +16,16 @@ RUN flutter create . --platforms=web \
  && flutter pub get \
  && grep -q google-signin-client_id web/index.html \
     || sed -i "s#</head>#  <meta name=\"google-signin-client_id\" content=\"${GOOGLE_CLIENT_ID}\">\n</head>#" web/index.html
+# Use the app icon for the browser favicon / PWA icons (flutter create writes the
+# default Flutter logo) and set the page/PWA title.
+RUN cp assets/icon/play_store_512.png web/favicon.png \
+ && cp assets/icon/play_store_512.png web/icons/Icon-192.png \
+ && cp assets/icon/play_store_512.png web/icons/Icon-512.png \
+ && cp assets/icon/play_store_512.png web/icons/Icon-maskable-192.png \
+ && cp assets/icon/play_store_512.png web/icons/Icon-maskable-512.png \
+ && sed -i 's#<title>family_budget_app</title>#<title>Ngân sách Gia đình</title>#' web/index.html \
+ && sed -i 's#content="family_budget_app"#content="Ngân sách Gia đình"#' web/index.html \
+ && sed -i 's#"family_budget_app"#"Ngân sách Gia đình"#g' web/manifest.json
 RUN flutter build web --release \
       --dart-define=API_BASE_URL=${API_BASE_URL} \
       --dart-define=GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
