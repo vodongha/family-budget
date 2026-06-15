@@ -74,6 +74,7 @@ class WalletRepository:
         owner_user_id: int | None = None,
         icon: str | None = None,
         color: str | None = None,
+        created_by_user_id: int | None = None,
     ) -> Wallet:
         wallet = Wallet(
             family_id=family_id,
@@ -82,6 +83,7 @@ class WalletRepository:
             owner_user_id=owner_user_id,
             icon=icon,
             color=color,
+            created_by_user_id=created_by_user_id,
         )
         self._session.add(wallet)
         self._session.flush()

@@ -44,10 +44,27 @@ class WalletService:
             owner_user_id = None
             wallet_family_id = family_id
         wallet = self._repo.add(
-            wallet_family_id, name, visibility, owner_user_id, icon, color
+            wallet_family_id,
+            name,
+            visibility,
+            owner_user_id,
+            icon,
+            color,
+            created_by_user_id=user_id,
         )
         self._session.commit()
         return wallet, 0, 0
+
+    @staticmethod
+    def _can_manage(wallet: Wallet, user_id: int, requester_is_owner: bool) -> bool:
+        """Whether ``user_id`` may edit/delete ``wallet``.
+
+        A **personal** wallet is private to its owner (only they can see it), so
+        seeing it means they may manage it. A **shared** family wallet may be
+        managed by the family owner **or** the member who created it."""
+        if wallet.visibility != WalletVisibility.FAMILY.value:
+            return True
+        return requester_is_owner or wallet.created_by_user_id == user_id
 
     def update(
         self,
@@ -61,18 +78,15 @@ class WalletService:
         color: str | None = None,
     ) -> tuple[Wallet, int, int]:
         """Edit a wallet's name/icon/colour. Permission mirrors delete: a personal
-        wallet by its owner (guaranteed by visibility), a shared family wallet
-        only by the family owner. Only provided (non-None) fields change.
+        wallet by its owner (guaranteed by visibility), a shared family wallet by
+        the family owner or its creator. Only provided (non-None) fields change.
 
         Raises [WalletNotFoundError] if not visible, [WalletPermissionError] if
         visible but not editable by this caller."""
         wallet = self._repo.get_visible_by_rid(family_id, user_id, rid)
         if wallet is None:
             raise WalletNotFoundError(rid)
-        if (
-            wallet.visibility == WalletVisibility.FAMILY.value
-            and not requester_is_owner
-        ):
+        if not self._can_manage(wallet, user_id, requester_is_owner):
             raise WalletPermissionError(rid)
         if name is not None:
             wallet.name = name
@@ -117,18 +131,15 @@ class WalletService:
 
         - A **personal** wallet may be deleted by its owner (guaranteed by
           visibility — only the owner can see it).
-        - A **family** wallet may be deleted only by the family owner, because it
-          destroys shared history.
+        - A **family** wallet may be deleted by the family owner or the member who
+          created it (it destroys shared history).
 
         Raises [WalletNotFoundError] if not visible, [WalletPermissionError] if
         visible but not deletable by this caller."""
         wallet = self._repo.get_visible_by_rid(family_id, user_id, rid)
         if wallet is None:
             raise WalletNotFoundError(rid)
-        if (
-            wallet.visibility == WalletVisibility.FAMILY.value
-            and not requester_is_owner
-        ):
+        if not self._can_manage(wallet, user_id, requester_is_owner):
             raise WalletPermissionError(rid)
         deleted = self._repo.delete_with_transactions(wallet.id)
         self._session.commit()
