@@ -1,4 +1,4 @@
-"""Deleting a wallet removes it and its transactions (owner-only)."""
+"""Deleting a wallet removes it and its transactions (family owner or creator)."""
 
 from fastapi.testclient import TestClient
 
@@ -68,6 +68,62 @@ def test_member_cannot_delete_wallet(
     rid = client.post("/wallets", json={"name": "Cash"}, headers=auth_headers).json()["rid"]
     member = _invite_member(client, auth_headers, "mom@example.com")
     assert client.delete(f"/wallets/{rid}", headers=member).status_code == 403
+
+
+def test_member_can_delete_wallet_they_created(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    # A member isn't the family owner, but the creator of a shared wallet may
+    # delete it (and its transactions).
+    member = _invite_member(client, auth_headers, "mom@example.com")
+    rid = _wallet_with_txn(client, member)
+    resp = client.delete(f"/wallets/{rid}", headers=member)
+    assert resp.status_code == 200
+    assert resp.json()["deleted_transactions"] == 1
+
+
+def test_member_can_edit_wallet_they_created(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    member = _invite_member(client, auth_headers, "mom@example.com")
+    rid = client.post(
+        "/wallets", json={"name": "Mom Cash"}, headers=member
+    ).json()["rid"]
+    resp = client.patch(f"/wallets/{rid}", json={"name": "Renamed"}, headers=member)
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "Renamed"
+
+
+def test_owner_can_delete_member_created_wallet(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    # The family owner can still manage any shared wallet, including one a member
+    # created.
+    member = _invite_member(client, auth_headers, "mom@example.com")
+    rid = client.post("/wallets", json={"name": "Mom Cash"}, headers=member).json()[
+        "rid"
+    ]
+    assert client.delete(f"/wallets/{rid}", headers=auth_headers).status_code == 200
+
+
+def test_created_by_me_flag(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    owner_rid = client.post(
+        "/wallets", json={"name": "Owner Cash"}, headers=auth_headers
+    ).json()["rid"]
+    member = _invite_member(client, auth_headers, "mom@example.com")
+    member_rid = client.post(
+        "/wallets", json={"name": "Mom Cash"}, headers=member
+    ).json()["rid"]
+
+    by_member = {w["rid"]: w for w in client.get("/wallets", headers=member).json()}
+    assert by_member[member_rid]["created_by_me"] is True
+    assert by_member[owner_rid]["created_by_me"] is False
+
+    by_owner = {w["rid"]: w for w in client.get("/wallets", headers=auth_headers).json()}
+    assert by_owner[owner_rid]["created_by_me"] is True
+    assert by_owner[member_rid]["created_by_me"] is False
 
 
 def test_cannot_delete_other_familys_wallet(client: TestClient) -> None:

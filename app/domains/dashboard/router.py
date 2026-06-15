@@ -41,6 +41,7 @@ def summary(
                 visibility=wallet.visibility,  # type: ignore[arg-type]
                 balance=balance,
                 txn_count=count,
+                created_by_me=wallet.created_by_user_id == current_user.id,
                 created_at=wallet.created_at,
             )
             for wallet, balance, count in wallets

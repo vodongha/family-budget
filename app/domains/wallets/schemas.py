@@ -42,4 +42,7 @@ class WalletRead(BaseModel):
     # Number of transactions in this wallet (shown before a delete). Defaults to
     # 0 for callers that don't compute it (e.g. the dashboard summary).
     txn_count: int = 0
+    # True when the caller created this wallet — lets the client show edit/delete
+    # for a shared wallet to its creator, not only the family owner.
+    created_by_me: bool = False
     created_at: datetime

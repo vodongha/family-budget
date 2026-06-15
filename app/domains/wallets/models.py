@@ -60,4 +60,10 @@ class Wallet(Base):
     owner_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), index=True, nullable=True
     )
+    # Who created the wallet. Lets the creator of a **shared** wallet edit/delete
+    # it too (not only the family owner). Nullable: wallets created before this
+    # column have an unknown creator and stay owner-managed.
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

@@ -21,7 +21,9 @@ from app.domains.wallets.service import (
 router = APIRouter(prefix="/wallets", tags=["wallets"])
 
 
-def _to_read(wallet: Wallet, balance: int, txn_count: int = 0) -> WalletRead:
+def _to_read(
+    wallet: Wallet, balance: int, viewer_id: int, txn_count: int = 0
+) -> WalletRead:
     return WalletRead(
         rid=wallet.rid,
         name=wallet.name,
@@ -30,6 +32,7 @@ def _to_read(wallet: Wallet, balance: int, txn_count: int = 0) -> WalletRead:
         visibility=wallet.visibility,  # type: ignore[arg-type]
         balance=balance,
         txn_count=txn_count,
+        created_by_me=wallet.created_by_user_id == viewer_id,
         created_at=wallet.created_at,
     )
 
@@ -63,7 +66,7 @@ def create_wallet(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Create a family before adding a shared wallet",
         ) from None
-    return _to_read(wallet, balance, count)
+    return _to_read(wallet, balance, current_user.id, count)
 
 
 @router.patch("/{rid}", response_model=WalletRead, summary="Edit a wallet")
@@ -75,8 +78,9 @@ def update_wallet(
     current_user: CurrentUser,
 ) -> WalletRead:
     """Rename a wallet or change its icon/colour. A personal wallet can be edited
-    by its owner; a shared family wallet only by the family owner (`403`). `404`
-    if it isn't visible to you. Visibility can't be changed."""
+    by its owner; a shared family wallet by the family owner or its creator
+    (`403` otherwise). `404` if it isn't visible to you. Visibility can't be
+    changed."""
     is_owner = current_user.role == UserRole.OWNER.value
     try:
         wallet, balance, count = WalletService(session).update(
@@ -95,9 +99,9 @@ def update_wallet(
     except WalletPermissionError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the family owner can edit a shared wallet",
+            detail="Only the family owner or the wallet's creator can edit a shared wallet",
         ) from None
-    return _to_read(wallet, balance, count)
+    return _to_read(wallet, balance, current_user.id, count)
 
 
 @router.get("", response_model=list[WalletRead], summary="List wallets")
@@ -110,7 +114,7 @@ def list_wallets(
     """Wallets visible to you with derived balances. `scope`: `all` (family +
     your personal), `family`, or `personal`."""
     return [
-        _to_read(wallet, balance, count)
+        _to_read(wallet, balance, current_user.id, count)
         for wallet, balance, count in WalletService(session).list_with_balances(
             family_id, current_user.id, scope.value
         )
@@ -134,7 +138,7 @@ def get_wallet(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
         ) from None
-    return _to_read(wallet, balance, count)
+    return _to_read(wallet, balance, current_user.id, count)
 
 
 @router.delete(
@@ -149,8 +153,8 @@ def delete_wallet(
     current_user: CurrentUser,
 ) -> WalletDeleteResult:
     """Delete a wallet and all of its transactions. A personal wallet can be
-    deleted by its owner; a shared family wallet only by the family owner (it
-    destroys shared history)."""
+    deleted by its owner; a shared family wallet by the family owner or its
+    creator (it destroys shared history)."""
     is_owner = current_user.role == UserRole.OWNER.value
     try:
         deleted = WalletService(session).delete(
@@ -163,6 +167,6 @@ def delete_wallet(
     except WalletPermissionError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the family owner can delete a shared wallet",
+            detail="Only the family owner or the wallet's creator can delete a shared wallet",
         ) from None
     return WalletDeleteResult(deleted_transactions=deleted)

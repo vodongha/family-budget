@@ -243,11 +243,15 @@ caller's own personal), `family`, or `personal`. It threads through
 `GET /wallets`, `GET /dashboard/summary`, `GET /transactions`, and both `/stats`
 endpoints — each constrains its transaction/balance aggregation to the caller's
 visible wallet ids. **Delete:** a personal wallet by its owner; a shared family
-wallet only by the family owner (`403` otherwise). New wallets default to family;
-`POST /wallets {visibility: "personal"}` makes a private one (owner = creator).
-Each wallet also carries an optional **`icon`** (emoji) and **`color`** (hex). `PATCH
-/wallets/{rid}` edits name/icon/color with the **same permission as delete** (family wallet →
-family owner, personal wallet → its owner); visibility is immutable.
+wallet by the family owner **or the member who created it** (`403` otherwise).
+New wallets default to family; `POST /wallets {visibility: "personal"}` makes a
+private one (owner = creator). Each wallet records `created_by_user_id` (set on
+create; the API returns `created_by_me` so the client can show edit/delete to the
+creator); wallets created before this column have an unknown creator and stay
+owner-managed. Each wallet also carries an optional **`icon`** (emoji) and
+**`color`** (hex). `PATCH /wallets/{rid}` edits name/icon/color with the **same
+permission as delete** (family wallet → family owner or creator, personal wallet →
+its owner); visibility is immutable.
 
 ### Privacy policy (`app/domains/legal/`)
 
