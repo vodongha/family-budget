@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     oracle_dsn: str = ""
     wallet_dir: str = "/app/wallet"
     wallet_password: str = ""
+    # Optional schema to own this app's tables, so several apps can share one ADB
+    # without colliding (each app gets its own schema). When set, every connection
+    # runs ``ALTER SESSION SET CURRENT_SCHEMA`` to it, so Alembic and the ORM
+    # create/read tables there instead of the connecting user's default schema.
+    # Empty → use the connecting user's own schema (back-compat).
+    oracle_schema: str = ""
 
     # Google Sign-In — the OAuth client ID(s) the backend accepts as the audience
     # of incoming Google ID tokens. Comma-separated to allow web + Android + iOS
