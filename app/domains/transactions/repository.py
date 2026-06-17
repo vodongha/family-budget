@@ -12,6 +12,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.domains.transactions.models import Transaction, TransactionType
+from app.domains.wallets.models import Wallet
 
 
 class TransactionRepository:
@@ -147,6 +148,58 @@ class TransactionRepository:
             wid: (int(inc), int(exp))
             for wid, inc, exp in self._session.execute(stmt)
         }
+
+    def boundary_transfer_legs(
+        self, wallet_ids: list[int], start: date | None = None
+    ) -> list[tuple[date, str, int, str]]:
+        """Transfer legs that cross the scope boundary: the leg's wallet is in
+        ``wallet_ids`` but its paired leg is in a wallet OUTSIDE that set (e.g. a
+        personal↔family transfer). Such a leg is real income (``transfer_in``) or
+        expense (``transfer_out``) **for this scope** — unlike an internal
+        transfer (both legs in scope), which nets to zero and is ignored.
+
+        Returns ``(occurred_on, type, amount, currency)`` per boundary leg, so the
+        caller can bucket and currency-convert them like ordinary income/expense.
+        """
+        if not wallet_ids:
+            return []
+        visible = set(wallet_ids)
+        leg_stmt = (
+            select(
+                Transaction.transfer_group_rid,
+                Transaction.type,
+                Transaction.amount,
+                Transaction.occurred_on,
+                Transaction.wallet_id,
+                Wallet.currency,
+            )
+            .join(Wallet, Transaction.wallet_id == Wallet.id)
+            .where(
+                Transaction.transfer_group_rid.is_not(None),
+                Transaction.wallet_id.in_(wallet_ids),
+            )
+        )
+        if start is not None:
+            leg_stmt = leg_stmt.where(Transaction.occurred_on >= start)
+        in_scope = list(self._session.execute(leg_stmt).all())
+        if not in_scope:
+            return []
+        group_rids = {r[0] for r in in_scope}
+        # All legs of those groups → each group's set of wallet ids, to find a
+        # leg's counterpart wallet(s).
+        group_wallets: dict[str, set[int]] = {}
+        for grid, wid in self._session.execute(
+            select(Transaction.transfer_group_rid, Transaction.wallet_id).where(
+                Transaction.transfer_group_rid.in_(group_rids)
+            )
+        ):
+            group_wallets.setdefault(grid, set()).add(wid)
+        result: list[tuple[date, str, int, str]] = []
+        for grid, type_, amount, occurred_on, wallet_id, currency in in_scope:
+            others = group_wallets.get(grid, set()) - {wallet_id}
+            if any(w not in visible for w in others):
+                result.append((occurred_on, type_, amount, currency))
+        return result
 
     def totals(self, wallet_ids: list[int]) -> tuple[int, int]:
         """Return (total_income, total_expense) over the given wallets."""

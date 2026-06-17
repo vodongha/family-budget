@@ -56,9 +56,13 @@ This app moves real household money. These rules are not style preferences.
   receive `family_id` explicitly; services never hold it as state. Enforced via the
   `get_current_family` FastAPI dependency (see Architecture).
 - **Transfers** are two linked transaction legs (`transfer_out` from source, `transfer_in` to
-  destination) sharing a `transfer_group_rid`. They affect wallet balances but are **excluded**
-  from income/expense totals and statistics (the signed-amount expression and the stats buckets
-  treat them specially). Don't reintroduce them into income/expense aggregation.
+  destination) sharing a `transfer_group_rid`. An **internal** transfer (both legs inside the scope
+  being viewed) is **excluded** from income/expense totals and statistics — it just moves money.
+  But a transfer that **crosses the scope boundary** (e.g. personal→family: one leg in a wallet
+  outside the current scope) *is* real income (`transfer_in`) or expense (`transfer_out`) for that
+  scope, so dashboard/stats count it (`TransactionRepository.boundary_transfer_legs`). This keeps a
+  scope's `net = income − expense` consistent with its wallet balances. Don't count internal
+  transfers as income/expense.
 - If you touch balance computation, transaction writes, or the `family_id` scope, **write a test**
   before you change behaviour. A wrong write at family scale is worse than a slow feature.
 - **Multi-currency.** Each wallet has an ISO-4217 `currency` (default `VND`); its amounts/balance

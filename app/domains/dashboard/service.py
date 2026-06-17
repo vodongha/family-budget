@@ -7,6 +7,7 @@ so a household with mixed-currency wallets gets one meaningful number."""
 from sqlalchemy.orm import Session
 
 from app.domains.rates.service import CurrencyConverter
+from app.domains.transactions.models import TransactionType
 from app.domains.transactions.repository import TransactionRepository
 from app.domains.wallets.models import Wallet, WalletScope
 from app.domains.wallets.service import WalletService
@@ -26,9 +27,8 @@ class DashboardService:
         are in the wallet's own currency; the totals are in the base currency.
         Works without a family (personal scope)."""
         wallets = self._wallets.list_with_balances(family_id, user_id, scope)
-        by_wallet = self._transactions.totals_by_wallet(
-            [wallet.id for wallet, _, _ in wallets]
-        )
+        ids = [wallet.id for wallet, _, _ in wallets]
+        by_wallet = self._transactions.totals_by_wallet(ids)
         converter = CurrencyConverter(self._session)
         total_income = 0
         total_expense = 0
@@ -36,4 +36,15 @@ class DashboardService:
             income, expense = by_wallet.get(wallet.id, (0, 0))
             total_income += converter.to_base(income, wallet.currency)
             total_expense += converter.to_base(expense, wallet.currency)
+        # A transfer crossing this scope's boundary (e.g. personal→family) is real
+        # income/expense for the scope; an internal transfer nets to zero and is
+        # excluded. This keeps net (income − expense) consistent with the balances.
+        for _on, type_, amount, currency in self._transactions.boundary_transfer_legs(
+            ids
+        ):
+            base = converter.to_base(amount, currency)
+            if type_ == TransactionType.TRANSFER_IN.value:
+                total_income += base
+            else:
+                total_expense += base
         return total_income, total_expense, wallets

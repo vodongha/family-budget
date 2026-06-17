@@ -48,6 +48,7 @@ def _to_read(transaction: Transaction, current_user_id: int) -> TransactionRead:
         amount=transaction.amount,
         note=transaction.note,
         occurred_on=transaction.occurred_on,
+        group_rid=transaction.transfer_group_rid,
         category=(
             CategoryRead.model_validate(transaction.category)
             if transaction.category is not None
