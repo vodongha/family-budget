@@ -339,6 +339,13 @@ decrypts it with the **wallet password** (set when downloading the wallet). It d
 returns `{status, database, error}`. A green `/health` means the wallet + thin-mode config is
 correct — that is the single biggest infra risk for this project.
 
+**Dedicated schema (sharing one ADB across apps).** Set `ORACLE_SCHEMA` to put this app's tables in
+a named schema instead of the connecting user's default — every connection then runs
+`ALTER SESSION SET CURRENT_SCHEMA` (see `app/core/database.py`). The schema must exist first as an
+Oracle user with quota; `scripts/create_schema.sql` creates a **schema-only** (`NO AUTHENTICATION`)
+owner named `FAMILY_BUDGET` so there's no extra password, and the app keeps connecting as `ADMIN`.
+Empty `ORACLE_SCHEMA` keeps the old behaviour (tables in the connecting user's schema).
+
 ## Secrets — never commit
 
 `.gitignore` excludes `wallet/`, `.env`, `.env.*` (except `.env.example`), and key material

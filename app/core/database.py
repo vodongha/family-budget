@@ -12,8 +12,9 @@ opened when a request actually needs the database.
 """
 
 from collections.abc import Generator
+from typing import Any
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
@@ -53,6 +54,16 @@ def get_engine() -> Engine:
             pool_size=5,
             max_overflow=5,
         )
+        # When ORACLE_SCHEMA is set, point every new connection at that schema so
+        # this app's tables live in (and are read from) a dedicated schema —
+        # letting several apps share one ADB. oracledb issues the matching
+        # ALTER SESSION SET CURRENT_SCHEMA when this attribute is assigned.
+        if settings.oracle_schema:
+
+            @event.listens_for(_engine, "connect")
+            def _set_current_schema(dbapi_conn: Any, _record: Any) -> None:
+                dbapi_conn.current_schema = settings.oracle_schema
+
     return _engine
 
 
