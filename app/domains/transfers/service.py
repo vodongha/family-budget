@@ -21,6 +21,10 @@ class SameWalletError(Exception):
     """Source and destination wallets are the same."""
 
 
+class CrossCurrencyTransferError(Exception):
+    """Source and destination wallets use different currencies."""
+
+
 class TransferNotFoundError(Exception):
     """No visible transfer with the given group rid."""
 
@@ -49,6 +53,11 @@ class TransferService:
         dst = self._wallets.get_visible_by_rid(family_id, user_id, to_wallet_rid)
         if dst is None:
             raise WalletNotFoundError(to_wallet_rid)
+        # Both legs record the same amount, so a transfer only makes sense between
+        # wallets of the same currency. Cross-currency moves need a conversion
+        # rate and are not supported yet.
+        if src.currency != dst.currency:
+            raise CrossCurrencyTransferError()
 
         group_rid = new_rid()
         on = occurred_on or date.today()

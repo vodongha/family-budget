@@ -13,6 +13,8 @@ class WalletCreate(BaseModel):
     visibility: WalletVisibility = WalletVisibility.FAMILY
     icon: str | None = Field(default=None, max_length=32)
     color: str | None = Field(default=None, max_length=16)
+    # ISO-4217 currency; defaults to the base currency. Immutable after creation.
+    currency: str = Field(default="VND", min_length=3, max_length=3)
 
 
 class WalletUpdate(BaseModel):
@@ -37,7 +39,9 @@ class WalletRead(BaseModel):
     color: str | None = None
     # "family" (shared) or "personal" (private to its owner).
     visibility: WalletVisibility
-    # Derived balance in integer minor units (đồng). Can be negative.
+    # ISO-4217 currency; the wallet's balance/amounts are minor units of this.
+    currency: str = "VND"
+    # Derived balance in integer minor units of ``currency``. Can be negative.
     balance: int
     # Number of transactions in this wallet (shown before a delete). Defaults to
     # 0 for callers that don't compute it (e.g. the dashboard summary).

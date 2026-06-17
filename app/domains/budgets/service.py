@@ -9,6 +9,7 @@ from app.domains.budgets.models import Budget
 from app.domains.budgets.repository import BudgetRepository
 from app.domains.categories.repository import CategoryRepository
 from app.domains.categories.service import CategoryNotFoundError
+from app.domains.rates.service import CurrencyConverter
 from app.domains.wallets.repository import WalletRepository
 
 
@@ -47,13 +48,28 @@ class BudgetService:
         self._categories = CategoryRepository(session)
         self._wallets = WalletRepository(session)
 
+    def _spent_base_by_category(
+        self, wallet_ids: list[int], start: date, end: date
+    ) -> dict[int, int]:
+        """Current-month spend per category, converted to the base currency (a
+        budget's amount is in the base currency, so spend must be too)."""
+        converter = CurrencyConverter(self._session)
+        totals: dict[int, int] = {}
+        for category_id, currency, total in self._repo.spent_by_category(
+            wallet_ids, start, end
+        ):
+            totals[category_id] = totals.get(category_id, 0) + converter.to_base(
+                total, currency
+            )
+        return totals
+
     def list_with_spent(
         self, family_id: int | None, user_id: int, scope: str
     ) -> list[tuple[Budget, int]]:
         budgets = self._repo.list(family_id, user_id, scope)
         wallet_ids = self._wallets.visible_wallet_ids(family_id, user_id, scope)
         start, end = _current_month_range()
-        spent = self._repo.spent_by_category(wallet_ids, start, end)
+        spent = self._spent_base_by_category(wallet_ids, start, end)
         return [(b, spent.get(b.category_id, 0)) for b in budgets]
 
     def create(
@@ -115,6 +131,6 @@ class BudgetService:
             family_id, user_id, _budget_scope(budget)
         )
         start, end = _current_month_range()
-        return self._repo.spent_by_category(wallet_ids, start, end).get(
+        return self._spent_base_by_category(wallet_ids, start, end).get(
             budget.category_id, 0
         )

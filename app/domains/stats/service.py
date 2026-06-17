@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
+from app.domains.rates.service import CurrencyConverter
 from app.domains.stats.repository import StatsRepository
 from app.domains.wallets.models import WalletScope
 from app.domains.wallets.repository import WalletRepository
@@ -54,6 +55,7 @@ def _month_window(today: date, months: int) -> list[tuple[int, int]]:
 
 class StatsService:
     def __init__(self, session: Session) -> None:
+        self._session = session
         self._repo = StatsRepository(session)
         self._wallets = WalletRepository(session)
 
@@ -70,18 +72,23 @@ class StatsService:
         start = date(window[0][0], window[0][1], 1)
         wallet_ids = self._wallets.visible_wallet_ids(family_id, user_id, scope)
 
+        converter = CurrencyConverter(self._session)
         income: dict[tuple[int, int], int] = {k: 0 for k in window}
         expense: dict[tuple[int, int], int] = {k: 0 for k in window}
-        for occurred_on, type_, amount in self._repo.rows_since(start, wallet_ids):
+        for occurred_on, type_, amount, currency in self._repo.rows_since(
+            start, wallet_ids
+        ):
             key = (occurred_on.year, occurred_on.month)
             if key not in income:
                 continue
-            # Only income/expense count toward the trend; transfer legs move money
+            # Convert to the base currency so a mixed-currency household has one
+            # comparable trend. Only income/expense count; transfer legs move money
             # between the family's own wallets and must not inflate either total.
+            base = converter.to_base(amount, currency)
             if type_ == "income":
-                income[key] += amount
+                income[key] += base
             elif type_ == "expense":
-                expense[key] += amount
+                expense[key] += base
 
         return [
             MonthlyPoint(f"{y:04d}-{m:02d}", income[(y, m)], expense[(y, m)])
@@ -107,7 +114,8 @@ class StatsService:
         wallet_ids = self._wallets.visible_wallet_ids(family_id, user_id, scope)
 
         # Keyed by category_rid (None for uncategorized). Value carries the
-        # running total plus the category's display metadata.
+        # running total (in base currency) plus the category's display metadata.
+        converter = CurrencyConverter(self._session)
         buckets: dict[str | None, CategorySlice] = {}
         for row in self._repo.category_rows_since(start, wallet_ids):
             if row.type != kind:
@@ -127,6 +135,6 @@ class StatsService:
                     amount=0,
                 )
                 buckets[row.category_rid] = slice_
-            slice_.amount += row.amount
+            slice_.amount += converter.to_base(row.amount, row.currency)
 
         return sorted(buckets.values(), key=lambda s: s.amount, reverse=True)

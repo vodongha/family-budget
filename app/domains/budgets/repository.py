@@ -16,6 +16,7 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from app.domains.budgets.models import Budget
 from app.domains.transactions.models import Transaction
+from app.domains.wallets.models import Wallet
 
 
 def _scope_clause(
@@ -88,25 +89,29 @@ class BudgetRepository:
 
     def spent_by_category(
         self, wallet_ids: list[int], start: date, end: date
-    ) -> dict[int, int]:
-        """Total transacted per category in ``[start, end)`` over ``wallet_ids``
-        (which already encode visibility). Used for current-month spending."""
+    ) -> list[tuple[int, str, int]]:
+        """``(category_id, currency, total)`` per category and wallet currency in
+        ``[start, end)`` over ``wallet_ids`` (which already encode visibility).
+        Split by currency so the caller can convert each part to the base currency
+        before summing. Used for current-month spending."""
         if not wallet_ids:
-            return {}
+            return []
         stmt = (
             select(
                 Transaction.category_id,
+                Wallet.currency,
                 func.coalesce(func.sum(Transaction.amount), 0),
             )
+            .join(Wallet, Transaction.wallet_id == Wallet.id)
             .where(
                 Transaction.category_id.is_not(None),
                 Transaction.wallet_id.in_(wallet_ids),
                 Transaction.occurred_on >= start,
                 Transaction.occurred_on < end,
             )
-            .group_by(Transaction.category_id)
+            .group_by(Transaction.category_id, Wallet.currency)
         )
-        return {
-            int(category_id): int(total)
-            for category_id, total in self._session.execute(stmt)
-        }
+        return [
+            (int(category_id), currency, int(total))
+            for category_id, currency, total in self._session.execute(stmt)
+        ]

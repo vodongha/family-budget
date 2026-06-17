@@ -112,6 +112,42 @@ class TransactionRepository:
             stmt = stmt.where(Transaction.occurred_on <= date_to)
         return list(self._session.scalars(stmt).all())
 
+    def totals_by_wallet(
+        self, wallet_ids: list[int]
+    ) -> dict[int, tuple[int, int]]:
+        """``{wallet_id: (income, expense)}`` (minor units of each wallet's own
+        currency). Used to convert each wallet's totals to a base currency before
+        summing across currencies. Wallets with no rows are absent."""
+        if not wallet_ids:
+            return {}
+        income = func.coalesce(
+            func.sum(
+                case(
+                    (Transaction.type == TransactionType.INCOME.value, Transaction.amount),
+                    else_=0,
+                )
+            ),
+            0,
+        )
+        expense = func.coalesce(
+            func.sum(
+                case(
+                    (Transaction.type == TransactionType.EXPENSE.value, Transaction.amount),
+                    else_=0,
+                )
+            ),
+            0,
+        )
+        stmt = (
+            select(Transaction.wallet_id, income, expense)
+            .where(Transaction.wallet_id.in_(wallet_ids))
+            .group_by(Transaction.wallet_id)
+        )
+        return {
+            wid: (int(inc), int(exp))
+            for wid, inc, exp in self._session.execute(stmt)
+        }
+
     def totals(self, wallet_ids: list[int]) -> tuple[int, int]:
         """Return (total_income, total_expense) over the given wallets."""
         if not wallet_ids:

@@ -3,12 +3,17 @@ has no family): personal wallets work without one; family wallets require it."""
 
 from sqlalchemy.orm import Session
 
+from app.core.currency import is_supported
 from app.domains.wallets.models import Wallet, WalletScope, WalletVisibility
 from app.domains.wallets.repository import WalletRepository
 
 
 class WalletNotFoundError(Exception):
     """Raised when a wallet rid is not visible to the caller."""
+
+
+class UnsupportedCurrencyError(Exception):
+    """Raised when creating a wallet with a currency we don't support."""
 
 
 class WalletPermissionError(Exception):
@@ -32,7 +37,11 @@ class WalletService:
         visibility: str = WalletVisibility.FAMILY.value,
         icon: str | None = None,
         color: str | None = None,
+        currency: str = "VND",
     ) -> tuple[Wallet, int, int]:
+        currency = currency.upper()
+        if not is_supported(currency):
+            raise UnsupportedCurrencyError(currency)
         if visibility == WalletVisibility.PERSONAL.value:
             # Personal wallets belong to the user, independent of any family.
             owner_user_id: int | None = user_id
@@ -51,6 +60,7 @@ class WalletService:
             icon,
             color,
             created_by_user_id=user_id,
+            currency=currency,
         )
         self._session.commit()
         return wallet, 0, 0

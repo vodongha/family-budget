@@ -39,6 +39,7 @@ def summary(
                 icon=wallet.icon,
                 color=wallet.color,
                 visibility=wallet.visibility,  # type: ignore[arg-type]
+                currency=wallet.currency,
                 balance=balance,
                 txn_count=count,
                 created_by_me=wallet.created_by_user_id == current_user.id,
