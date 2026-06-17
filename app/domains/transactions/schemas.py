@@ -46,6 +46,9 @@ class TransactionRead(BaseModel):
     amount: int
     note: str | None
     occurred_on: date
+    # The two legs of a transfer share this; null for normal transactions. Lets a
+    # client pair legs (e.g. to detect a transfer crossing the scope boundary).
+    group_rid: str | None = None
     category: CategoryRead | None
     # Who recorded it + whether the current caller may edit/delete it (creator only).
     created_by: TransactionCreator

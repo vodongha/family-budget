@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.domains.rates.service import CurrencyConverter
 from app.domains.stats.repository import StatsRepository
+from app.domains.transactions.models import TransactionType
+from app.domains.transactions.repository import TransactionRepository
 from app.domains.wallets.models import WalletScope
 from app.domains.wallets.repository import WalletRepository
 
@@ -58,6 +60,7 @@ class StatsService:
         self._session = session
         self._repo = StatsRepository(session)
         self._wallets = WalletRepository(session)
+        self._txns = TransactionRepository(session)
 
     def monthly(
         self,
@@ -88,6 +91,20 @@ class StatsService:
             if type_ == "income":
                 income[key] += base
             elif type_ == "expense":
+                expense[key] += base
+
+        # Transfers crossing the scope boundary (e.g. personal→family) count as
+        # income/expense for this scope; internal transfers are ignored.
+        for occurred_on, type_, amount, currency in self._txns.boundary_transfer_legs(
+            wallet_ids, start
+        ):
+            key = (occurred_on.year, occurred_on.month)
+            if key not in income:
+                continue
+            base = converter.to_base(amount, currency)
+            if type_ == TransactionType.TRANSFER_IN.value:
+                income[key] += base
+            else:
                 expense[key] += base
 
         return [
@@ -136,5 +153,31 @@ class StatsService:
                 )
                 buckets[row.category_rid] = slice_
             slice_.amount += converter.to_base(row.amount, row.currency)
+
+        # Boundary-crossing transfers (e.g. personal→family) are income/expense
+        # for this scope but have no category, so they fold into the uncategorized
+        # bucket of the matching kind.
+        for _on, type_, amount, currency in self._txns.boundary_transfer_legs(
+            wallet_ids, start
+        ):
+            leg_kind = (
+                "income"
+                if type_ == TransactionType.TRANSFER_IN.value
+                else "expense"
+            )
+            if leg_kind != kind:
+                continue
+            slice_ = buckets.get(None)
+            if slice_ is None:
+                slice_ = CategorySlice(
+                    category_rid=None,
+                    name=None,
+                    icon=None,
+                    color=None,
+                    default_key="uncategorized",
+                    amount=0,
+                )
+                buckets[None] = slice_
+            slice_.amount += converter.to_base(amount, currency)
 
         return sorted(buckets.values(), key=lambda s: s.amount, reverse=True)
