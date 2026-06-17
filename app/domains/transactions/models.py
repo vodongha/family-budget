@@ -40,8 +40,10 @@ class Transaction(Base):
     )
     wallet_id: Mapped[int] = mapped_column(ForeignKey("wallets.id"), index=True)
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    # Stores a TransactionType value ("expense" / "income").
-    type: Mapped[str] = mapped_column(String(10))
+    # Stores a TransactionType value: "expense" / "income" / "transfer_out" /
+    # "transfer_in". Width must hold the longest ("transfer_out" = 12 chars) —
+    # Oracle enforces VARCHAR2 length (ORA-12899) while SQLite does not.
+    type: Mapped[str] = mapped_column(String(20))
     # Positive integer, minor units (đồng). BigInteger gives headroom for summed
     # household amounts beyond a plain 32-bit Integer.
     amount: Mapped[int] = mapped_column(BigInteger)

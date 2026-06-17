@@ -457,6 +457,13 @@ Production runs on **Fly.io**, region `sin` (Singapore — closest to ADB), doma
   absolute local wallet path; env vars beat `.env` in pydantic-settings.
 - **Thin mode uses `ewallet.pem` + wallet password**, not `cwallet.sso`. A missing/blank
   `WALLET_PASSWORD` means no connection.
+- **Oracle enforces VARCHAR2 length; SQLite doesn't.** A value longer than the column width raises
+  `ORA-12899` at runtime while the SQLite test suite passes. Size `String(n)` for the **longest**
+  value a column can hold (e.g. `transactions.type` must fit `"transfer_out"` = 12 chars).
+- **Oracle stores `''` as NULL.** Inserting an empty string into a `NOT NULL` column raises
+  `ORA-01400` (SQLite accepts `''`, hiding it). For "optional text with a real absence" (e.g.
+  `users.hashed_password` for Google-only accounts) make the column **nullable** and write `None`,
+  never `""`.
 - **Oracle has no native boolean — filter with `== true()`/`== false()`, never `.is_(True/False)`.**
   A `Boolean` column maps to `NUMBER(1)`; `.is_(False)` renders `... IS 0`, which Oracle rejects
   with `ORA-00908: missing NULL keyword` (`IS` is only valid with `NULL`). SQLite accepts `IS 0`,

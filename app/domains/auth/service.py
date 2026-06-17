@@ -134,9 +134,11 @@ class AuthService:
             return user
 
         # Brand-new user — no family yet; they create or join one after sign-in.
+        # No password (None, not ""): Oracle coerces '' to NULL and rejects it on
+        # a NOT NULL column (ORA-01400). The column is nullable for this reason.
         user = self._repo.add_user(
             email=email,
-            hashed_password="",
+            hashed_password=None,
             display_name=display_name,
             family_id=None,
             role=UserRole.MEMBER,

@@ -47,8 +47,10 @@ class User(Base):
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     rid: Mapped[str] = mapped_column(String(26), unique=True, default=new_rid)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    # Empty for Google-only accounts (they authenticate via google_sub, not a password).
-    hashed_password: Mapped[str] = mapped_column(String(255))
+    # NULL for Google-only accounts (they authenticate via google_sub, not a
+    # password). Must be nullable, not "": Oracle stores '' as NULL, so a NOT NULL
+    # column rejects the empty string (ORA-01400) — SQLite accepts it, hiding the bug.
+    hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Google account subject id when linked; cleared on account deletion (unlink).
     google_sub: Mapped[str | None] = mapped_column(
         String(255), unique=True, index=True, nullable=True
