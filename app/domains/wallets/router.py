@@ -12,6 +12,7 @@ from app.domains.wallets.schemas import (
     WalletUpdate,
 )
 from app.domains.wallets.service import (
+    UnsupportedCurrencyError,
     WalletFamilyRequiredError,
     WalletNotFoundError,
     WalletPermissionError,
@@ -30,6 +31,7 @@ def _to_read(
         icon=wallet.icon,
         color=wallet.color,
         visibility=wallet.visibility,  # type: ignore[arg-type]
+        currency=wallet.currency,
         balance=balance,
         txn_count=txn_count,
         created_by_me=wallet.created_by_user_id == viewer_id,
@@ -60,11 +62,17 @@ def create_wallet(
             payload.visibility.value,
             payload.icon,
             payload.color,
+            payload.currency,
         )
     except WalletFamilyRequiredError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Create a family before adding a shared wallet",
+        ) from None
+    except UnsupportedCurrencyError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Unsupported currency",
         ) from None
     return _to_read(wallet, balance, current_user.id, count)
 

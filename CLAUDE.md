@@ -61,6 +61,13 @@ This app moves real household money. These rules are not style preferences.
   treat them specially). Don't reintroduce them into income/expense aggregation.
 - If you touch balance computation, transaction writes, or the `family_id` scope, **write a test**
   before you change behaviour. A wrong write at family scale is worse than a slow feature.
+- **Multi-currency.** Each wallet has an ISO-4217 `currency` (default `VND`); its amounts/balance
+  are minor units of **that** currency (`app/core/currency.py` holds the supported set + decimals).
+  Per-wallet figures display in the wallet's own currency; any total that spans wallets (dashboard
+  income/expense/net, stats, budget `spent`) is converted to the **base currency (VND)** via
+  `CurrencyConverter` (`app/domains/rates/`), which reads the `exchange_rates` table (refreshed by a
+  Celery-beat job from open.er-api.com, seeded by migration). **Never sum raw minor units across
+  currencies.** Transfers require both wallets to share a currency (cross-currency is rejected).
 
 ## Identifiers
 

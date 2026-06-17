@@ -75,6 +75,7 @@ class WalletRepository:
         icon: str | None = None,
         color: str | None = None,
         created_by_user_id: int | None = None,
+        currency: str = "VND",
     ) -> Wallet:
         wallet = Wallet(
             family_id=family_id,
@@ -84,6 +85,7 @@ class WalletRepository:
             icon=icon,
             color=color,
             created_by_user_id=created_by_user_id,
+            currency=currency,
         )
         self._session.add(wallet)
         self._session.flush()

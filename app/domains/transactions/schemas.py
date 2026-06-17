@@ -39,6 +39,9 @@ class TransactionCreator(BaseModel):
 class TransactionRead(BaseModel):
     rid: str
     wallet_rid: str
+    # The wallet's ISO-4217 currency — the amount is minor units of this, so the
+    # client can format each row in the right currency.
+    currency: str = "VND"
     type: TransactionType
     amount: int
     note: str | None

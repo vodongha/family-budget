@@ -5,6 +5,7 @@ from celery import Celery
 from app.core.config import settings
 from app.core.database import new_session
 from app.domains.account.maintenance import purge_expired_accounts
+from app.domains.rates.tasks import fetch_exchange_rates
 
 celery = Celery(
     "family_budget",
@@ -23,8 +24,23 @@ celery.conf.update(
             "task": "app.purge_expired_accounts",
             "schedule": 24 * 60 * 60.0,
         },
+        # Every 12h: refresh currency exchange rates from the public source.
+        "refresh-exchange-rates": {
+            "task": "app.refresh_exchange_rates",
+            "schedule": 12 * 60 * 60.0,
+        },
     },
 )
+
+
+@celery.task(name="app.refresh_exchange_rates")
+def refresh_exchange_rates_task() -> int:
+    """Celery Beat entry point — wraps the rate fetch in a session."""
+    session = new_session()
+    try:
+        return fetch_exchange_rates(session)
+    finally:
+        session.close()
 
 
 @celery.task(name="app.purge_expired_accounts")

@@ -43,6 +43,7 @@ def _to_read(transaction: Transaction, current_user_id: int) -> TransactionRead:
     return TransactionRead(
         rid=transaction.rid,
         wallet_rid=transaction.wallet.rid,
+        currency=transaction.wallet.currency,
         type=transaction.type,  # type: ignore[arg-type]
         amount=transaction.amount,
         note=transaction.note,

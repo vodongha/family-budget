@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from app.core.deps import CurrentUser, OptionalFamily, SessionDep
 from app.domains.transfers.schemas import TransferCreate, TransferRead
 from app.domains.transfers.service import (
+    CrossCurrencyTransferError,
     SameWalletError,
     TransferNotFoundError,
     TransferService,
@@ -43,6 +44,11 @@ def create_transfer(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Source and destination must be different wallets",
+        ) from None
+    except CrossCurrencyTransferError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both wallets must use the same currency to transfer",
         ) from None
     except WalletNotFoundError:
         raise HTTPException(

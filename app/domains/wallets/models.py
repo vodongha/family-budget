@@ -56,6 +56,16 @@ class Wallet(Base):
         default=WalletVisibility.FAMILY.value,
         nullable=False,
     )
+    # ISO-4217 currency of the wallet's money. Amounts in this wallet (and its
+    # transactions) are integer minor units of THIS currency. Immutable after
+    # creation (changing it would reinterpret every stored amount). Existing
+    # wallets default to the base currency.
+    currency: Mapped[str] = mapped_column(
+        String(3),
+        server_default=text("'VND'"),
+        default="VND",
+        nullable=False,
+    )
     # Non-null only for personal wallets — the sole member who can see it.
     owner_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), index=True, nullable=True
