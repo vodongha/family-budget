@@ -59,7 +59,7 @@ class AuthRepository:
     def add_user(
         self,
         email: str,
-        hashed_password: str,
+        hashed_password: str | None,
         display_name: str,
         family_id: int | None,
         role: UserRole,
