@@ -23,44 +23,34 @@
   </form>
 </div>
 
-{% if data.rows %}
-<div class="dt-scroll">
-  <table>
-    <thead>
-      <tr><th>Date</th><th>Type</th><th>Amount</th><th>Category</th><th>Note</th><th>By</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for t in data.rows %}
-      <tr>
-        <td>{{ t.occurred_on.isoformat() }}</td>
-        <td>{{ t.type }}</td>
-        <td>{{ t.amount | money(wallet.currency) }} {{ wallet.currency }}</td>
-        <td>{{ t.category.name if t.category else '—' }}</td>
-        <td>{{ t.note or '' }}</td>
-        <td>{{ t.creator.display_name if t.creator else '—' }}</td>
-        <td style="white-space:nowrap;">
-          {% if not t.transfer_group_rid %}
-            <a href="/admin/transactions/{{ t.rid }}/edit">Edit</a>
-          {% else %}<span class="pill pill-warn">transfer</span>{% endif %}
-          <form method="post" action="/admin/transactions/{{ t.rid }}/delete" style="display:inline; margin-left:8px;"
-                onsubmit="return confirm('Delete this transaction? (a transfer removes both legs)');">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <button class="btn btn-danger" type="submit" style="padding:3px 9px;">Delete</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-<div class="dt-foot">
-  <span>{{ data.total }} total · page {{ data.page }}/{{ data.pages }}</span>
-  <div class="dt-nav">
-    {% if data.page > 1 %}<a class="btn" href="{{ base_url }}?page={{ data.page - 1 }}">‹</a>{% else %}<button class="btn" disabled>‹</button>{% endif %}
-    <span class="dt-page">{{ data.page }} / {{ data.pages }}</span>
-    {% if data.page < data.pages %}<a class="btn" href="{{ base_url }}?page={{ data.page + 1 }}">›</a>{% else %}<button class="btn" disabled>›</button>{% endif %}
-  </div>
-</div>
+{% if txns %}
+<table class="dt" data-per-page="25">
+  <thead>
+    <tr><th>Date</th><th>Type</th><th>Amount</th><th>Category</th><th>Note</th><th>By</th><th data-nosort></th></tr>
+  </thead>
+  <tbody>
+    {% for t in txns %}
+    <tr>
+      <td>{{ t.occurred_on.isoformat() }}</td>
+      <td>{{ t.type }}</td>
+      <td>{{ t.amount | money(wallet.currency) }} {{ wallet.currency }}</td>
+      <td>{{ t.category.name if t.category else '—' }}</td>
+      <td>{{ t.note or '' }}</td>
+      <td>{{ t.creator.display_name if t.creator else '—' }}</td>
+      <td style="white-space:nowrap;">
+        {% if not t.transfer_group_rid %}
+          <a href="/admin/transactions/{{ t.rid }}/edit">Edit</a>
+        {% else %}<span class="pill pill-warn">transfer</span>{% endif %}
+        <form method="post" action="/admin/transactions/{{ t.rid }}/delete" style="display:inline; margin-left:8px;"
+              onsubmit="return confirm('Delete this transaction? (a transfer removes both legs)');">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn btn-danger" type="submit" style="padding:3px 9px;">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% else %}
 <div class="empty">No transactions in this wallet.</div>
 {% endif %}

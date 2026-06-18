@@ -171,6 +171,15 @@ class AdminService:
             "per_page": per_page,
         }
 
+    def transactions_all(self, *, cap: int = 2000, **filters: object):  # type: ignore[no-untyped-def]
+        """All matching transactions (newest first), capped — the client-side
+        datatable handles sort/search/pagination, so every admin table looks the
+        same. ``cap`` guards against an unbounded load."""
+        rows, _ = self._repo.transactions_page(
+            page=1, per_page=cap, **filters  # type: ignore[arg-type]
+        )
+        return rows
+
     def create_transaction(
         self,
         actor: User,
@@ -232,6 +241,9 @@ class AdminService:
 
     def get_family(self, rid: str):  # type: ignore[no-untyped-def]
         return self._repo.get_family_by_rid(rid)
+
+    def get_family_by_id(self, family_id: int):  # type: ignore[no-untyped-def]
+        return self._repo.get_family_by_id(family_id)
 
     def family_overview(self, family) -> dict[str, object]:  # type: ignore[no-untyped-def]
         from app.domains.families.repository import FamilyRepository

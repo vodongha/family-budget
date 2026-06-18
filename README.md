@@ -67,7 +67,7 @@ income/expense together, scoped per family.
   separate from the API JWT and the web app). Responsive (collapsible grouped icon sidebar →
   drawer on mobile); tables are datatables (sort + search + pagination). Dashboard, **user
   management** (edit / soft-delete / restore / reset password / unlink Google) and **transaction
-  CRUD** per wallet + a global server-side-paginated transactions view, **family management**
+  CRUD** per wallet + a global transactions view, **family management**
   (rename / soft-delete / restore, members + wallets, and category & budget CRUD), and wallet
   rename/delete now; an Ops dependency panel planned. Admin transaction writes reuse the app's
   money logic (integer minor units, derived balances); transfers are delete-only. Admins are

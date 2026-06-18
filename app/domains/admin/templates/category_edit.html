@@ -1,0 +1,19 @@
+{% extends "shell.html" %}
+{% block title %}Edit category{% endblock %}
+{% block heading %}Edit category{% endblock %}
+{% block content %}
+<form class="form" method="post" action="/admin/categories/{{ cat.rid }}/edit">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="family_rid" value="{{ family_rid }}">
+  <div class="field"><label>Name</label><input name="name" value="{{ cat.name }}" required></div>
+  <div class="kv" style="margin-bottom:16px;"><div class="k">Kind</div><div class="v">{{ cat.kind }}</div></div>
+  <div class="form-row">
+    <div class="field"><label>Icon</label><input name="icon" value="{{ cat.icon or '' }}"></div>
+    <div class="field"><label>Color</label><input name="color" value="{{ cat.color or '' }}" placeholder="#5B5BF0"></div>
+  </div>
+  <div class="actions">
+    <button class="btn-primary" type="submit">Save</button>
+    <a class="btn" href="{{ back }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

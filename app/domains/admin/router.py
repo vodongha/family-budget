@@ -367,13 +367,6 @@ def user_unlink_google(
 # --- wallet detail + transactions ------------------------------------------
 
 
-def _page_arg(request: Request) -> int:
-    try:
-        return max(1, int(request.query_params.get("page", "1")))
-    except ValueError:
-        return 1
-
-
 @router.get("/wallets/{rid}", response_class=HTMLResponse, response_model=None)
 def wallet_detail(
     request: Request, session: SessionDep, admin: CurrentAdmin, rid: str
@@ -383,8 +376,6 @@ def wallet_detail(
     if wallet is None:
         flash(request, "Wallet not found.", "error")
         return RedirectResponse("/admin/users", status_code=_REDIRECT)
-    page = _page_arg(request)
-    data = svc.transactions(wallet_id=wallet.id, page=page, per_page=25)
     return templates.TemplateResponse(
         request,
         "wallet_detail.html",
@@ -395,8 +386,7 @@ def wallet_detail(
             crumbs=[{"label": "Wallet"}, {"label": wallet.name}],
             wallet=wallet,
             balance=svc.wallet_balance(wallet),
-            data=data,
-            base_url=f"/admin/wallets/{wallet.rid}",
+            txns=svc.transactions_all(wallet_id=wallet.id),
         ),
     )
 
@@ -615,11 +605,6 @@ def transactions_page(
     request: Request, session: SessionDep, admin: CurrentAdmin
 ) -> HTMLResponse:
     svc = AdminService(session)
-    page = _page_arg(request)
-    type_ = request.query_params.get("type") or None
-    if type_ not in (None, "expense", "income", "transfer_in", "transfer_out"):
-        type_ = None
-    data = svc.transactions(type_=type_, page=page, per_page=30)
     return templates.TemplateResponse(
         request,
         "transactions.html",
@@ -628,9 +613,7 @@ def transactions_page(
             admin,
             "transactions",
             crumbs=[{"label": "Transactions"}],
-            data=data,
-            type_=type_ or "",
-            base_url="/admin/transactions",
+            txns=svc.transactions_all(),
         ),
     )
 
@@ -815,6 +798,32 @@ def category_add(
     return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
 
 
+@router.get("/categories/{rid}/edit", response_class=HTMLResponse, response_model=None)
+def category_edit_form(
+    request: Request, session: SessionDep, admin: CurrentAdmin, rid: str
+) -> HTMLResponse | RedirectResponse:
+    svc = AdminService(session)
+    cat = svc.get_category(rid)
+    if cat is None:
+        flash(request, "Category not found.", "error")
+        return RedirectResponse("/admin/families", status_code=_REDIRECT)
+    family = svc.get_family_by_id(cat.family_id) if cat.family_id else None
+    back = f"/admin/families/{family.rid}" if family else "/admin/families"
+    return templates.TemplateResponse(
+        request,
+        "category_edit.html",
+        _ctx(
+            request,
+            admin,
+            "families",
+            crumbs=[{"label": "Families", "href": "/admin/families"}, {"label": "Edit category"}],
+            cat=cat,
+            family_rid=family.rid if family else "",
+            back=back,
+        ),
+    )
+
+
 @router.post("/categories/{rid}/edit")
 def category_edit(
     request: Request,
@@ -888,6 +897,32 @@ def budget_add(
     svc.log(admin, "budget.create", target_type="budget", target_rid=budget.rid)
     flash(request, "Budget added.")
     return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
+
+
+@router.get("/budgets/{rid}/edit", response_class=HTMLResponse, response_model=None)
+def budget_edit_form(
+    request: Request, session: SessionDep, admin: CurrentAdmin, rid: str
+) -> HTMLResponse | RedirectResponse:
+    svc = AdminService(session)
+    budget = svc.get_budget(rid)
+    if budget is None:
+        flash(request, "Budget not found.", "error")
+        return RedirectResponse("/admin/families", status_code=_REDIRECT)
+    family = svc.get_family_by_id(budget.family_id) if budget.family_id else None
+    back = f"/admin/families/{family.rid}" if family else "/admin/families"
+    return templates.TemplateResponse(
+        request,
+        "budget_edit.html",
+        _ctx(
+            request,
+            admin,
+            "families",
+            crumbs=[{"label": "Families", "href": "/admin/families"}, {"label": "Edit budget"}],
+            budget=budget,
+            family_rid=family.rid if family else "",
+            back=back,
+        ),
+    )
 
 
 @router.post("/budgets/{rid}/edit")

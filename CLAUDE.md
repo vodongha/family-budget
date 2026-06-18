@@ -306,7 +306,11 @@ Dockerfile's `COPY app ./app`).
   (Overview / Manage / System) and each **group header is accordion-collapsible** (persisted).
   Tables use a **self-contained datatable enhancer** (no CDN) — add `class="dt"` (and optional
   `data-per-page`) and it gains a **page-size selector**, per-column **sort**, a **search** box,
-  and **pagination**; mark a non-sortable header with `data-nosort`.
+  and **pagination**; mark a non-sortable header with `data-nosort`. **Every admin table is a
+  `dt`** — one consistent style, no bespoke server-side pagination. Tables that could grow (the
+  transaction lists) load up to a cap (`AdminService.transactions_all`, default 2000) and let the
+  datatable page client-side. Editable rows (categories/budgets) are read-only `dt` tables with an
+  **Edit** link to a small edit page (an `<input>` cell would break `dt` search/sort).
 - **Management actions reuse the app's services, never raw writes.** Money rules stay intact:
   admin transaction create/edit/delete go through `TransactionRepository` (integer minor units of
   the wallet's currency, balances derived) — the admin layer only bypasses the `family_id`/owner
@@ -317,11 +321,10 @@ Dockerfile's `COPY app ./app`).
   **flash** messages (`flash` / `pop_flashes`, in the session).
 - **Scope so far:** login/logout; dashboard; **Users** (list → detail → edit; soft-delete / restore
   / reset-password / unlink-Google); per-**wallet** transaction list with **transaction CRUD** +
-  wallet rename / delete; a global **/admin/transactions** (server-side paginated, type filter);
-  **Families** (detail → rename / soft-delete / restore, member + wallet views, and **Categories**
-  and **Budgets** CRUD on the family page); **Audit** log. Categories/budgets edit inline in tables
-  via the HTML5 `form=` attribute (a `<form>` can't wrap `<td>`s). Planned: an Ops **Dependencies**
-  panel reading GitHub Dependabot alerts for both repos (app + backend).
+  wallet rename / delete; a global **/admin/transactions**; **Families** (detail → rename /
+  soft-delete / restore, member + wallet views, and **Categories** and **Budgets** CRUD with
+  per-row Edit pages); **Audit** log. Planned: an Ops **Dependencies** panel reading GitHub
+  Dependabot alerts for both repos (app + backend).
 
 ### Privacy policy (`app/domains/legal/`)
 
