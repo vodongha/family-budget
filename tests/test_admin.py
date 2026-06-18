@@ -6,8 +6,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
-from app.domains.users.models import User, UserRole, new_rid
+from app.domains.users.models import Family, User, UserRole, new_rid
 from app.domains.wallets.models import Wallet, WalletVisibility
+
+
+def _make_family(db: Session, name: str = "Vo Family") -> Family:
+    f = Family(rid=new_rid(), name=name)
+    db.add(f)
+    db.commit()
+    return f
 
 
 def _csrf_from(client: TestClient, path: str) -> str:
@@ -260,6 +267,90 @@ def test_transactions_page_renders(client: TestClient, db_session: Session) -> N
     _make_admin(db_session)
     _login(client)
     assert client.get("/admin/transactions").status_code == 200
+
+
+def test_family_detail_and_rename(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    fam = _make_family(db_session)
+    _login(client)
+    assert client.get(f"/admin/families/{fam.rid}").status_code == 200
+    csrf = _csrf_from(client, f"/admin/families/{fam.rid}")
+    client.post(
+        f"/admin/families/{fam.rid}/rename",
+        data={"name": "Renamed Family", "csrf": csrf},
+        follow_redirects=False,
+    )
+    db_session.refresh(fam)
+    assert fam.name == "Renamed Family"
+
+
+def test_category_add_and_delete(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    fam = _make_family(db_session)
+    _login(client)
+    csrf = _csrf_from(client, f"/admin/families/{fam.rid}")
+    client.post(
+        f"/admin/families/{fam.rid}/categories",
+        data={"name": "Groceries", "kind": "expense", "csrf": csrf},
+        follow_redirects=False,
+    )
+    page = client.get(f"/admin/families/{fam.rid}").text
+    assert "Groceries" in page
+    rid = re.search(r"/admin/categories/([0-9A-Z]+)/delete", page).group(1)
+    client.post(
+        f"/admin/categories/{rid}/delete",
+        data={"family_rid": fam.rid, "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert "Groceries" not in client.get(f"/admin/families/{fam.rid}").text
+
+
+def test_budget_add_and_delete(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    fam = _make_family(db_session)
+    _login(client)
+    csrf = _csrf_from(client, f"/admin/families/{fam.rid}")
+    client.post(
+        f"/admin/families/{fam.rid}/categories",
+        data={"name": "Bills", "kind": "expense", "csrf": csrf},
+        follow_redirects=False,
+    )
+    page = client.get(f"/admin/families/{fam.rid}").text
+    cat_rid = re.search(r"/admin/categories/([0-9A-Z]+)/delete", page).group(1)
+    client.post(
+        f"/admin/families/{fam.rid}/budgets",
+        data={"category_rid": cat_rid, "amount": "500000", "csrf": csrf},
+        follow_redirects=False,
+    )
+    page = client.get(f"/admin/families/{fam.rid}").text
+    assert "500000" in page
+    bud_rid = re.search(r"/admin/budgets/([0-9A-Z]+)/delete", page).group(1)
+    client.post(
+        f"/admin/budgets/{bud_rid}/delete",
+        data={"family_rid": fam.rid, "csrf": csrf},
+        follow_redirects=False,
+    )
+
+
+def test_wallet_rename_and_delete(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    owner = _make_user(db_session)
+    wallet = _make_wallet(db_session, owner)
+    _login(client)
+    csrf = _csrf_from(client, f"/admin/wallets/{wallet.rid}")
+    client.post(
+        f"/admin/wallets/{wallet.rid}/rename",
+        data={"name": "Renamed Wallet", "csrf": csrf},
+        follow_redirects=False,
+    )
+    db_session.refresh(wallet)
+    assert wallet.name == "Renamed Wallet"
+    client.post(
+        f"/admin/wallets/{wallet.rid}/delete",
+        data={"csrf": csrf},
+        follow_redirects=False,
+    )
+    assert client.get(f"/admin/wallets/{wallet.rid}", follow_redirects=False).status_code == 303
 
 
 def test_logout_clears_session(client: TestClient, db_session: Session) -> None:

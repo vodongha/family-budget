@@ -1,0 +1,146 @@
+{% extends "shell.html" %}
+{% block title %}{{ family.name }}{% endblock %}
+{% block heading %}{{ family.name }}{% endblock %}
+{% block content %}
+
+<div class="detail-grid">
+  <div class="kv"><div class="k">Status</div><div class="v">{{ 'deleted' if family.is_deleted else 'active' }}</div></div>
+  <div class="kv"><div class="k">Members</div><div class="v">{{ members | length }}</div></div>
+  <div class="kv"><div class="k">Wallets</div><div class="v">{{ wallets | length }}</div></div>
+  <div class="kv"><div class="k">Created</div><div class="v">{{ family.created_at.strftime('%Y-%m-%d %H:%M') if family.created_at else '—' }}</div></div>
+</div>
+
+<form method="post" action="/admin/families/{{ family.rid }}/rename" class="toolbar" style="align-items:flex-end;">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="field" style="margin:0;"><label>Rename family</label><input name="name" value="{{ family.name }}" required></div>
+  <button class="btn-primary" type="submit">Rename</button>
+</form>
+
+<div class="toolbar">
+  {% if family.is_deleted %}
+    <form method="post" action="/admin/families/{{ family.rid }}/restore" style="margin:0;">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Restore family</button>
+    </form>
+  {% else %}
+    <form method="post" action="/admin/families/{{ family.rid }}/delete" style="margin:0;"
+          onsubmit="return confirm('Soft-delete this family?');">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-danger" type="submit">Soft-delete family</button>
+    </form>
+  {% endif %}
+</div>
+
+<section>
+  <h2>Members</h2>
+  {% if members %}
+  <table class="dt" data-per-page="10">
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th data-nosort></th></tr></thead>
+    <tbody>
+      {% for m in members %}
+      <tr><td>{{ m.display_name }}</td><td>{{ m.email }}</td><td>{{ m.role }}</td>
+        <td><a href="/admin/users/{{ m.rid }}">Open</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">No members.</div>{% endif %}
+</section>
+
+<section>
+  <h2>Wallets</h2>
+  {% if wallets %}
+  <table class="dt" data-per-page="10">
+    <thead><tr><th>Name</th><th>Currency</th><th>Balance</th><th data-nosort></th></tr></thead>
+    <tbody>
+      {% for w in wallets %}
+      <tr><td>{{ w.wallet.name }}</td><td>{{ w.wallet.currency }}</td>
+        <td>{{ w.balance | money(w.wallet.currency) }} {{ w.wallet.currency }}</td>
+        <td><a href="/admin/wallets/{{ w.wallet.rid }}">Open</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">No wallets.</div>{% endif %}
+</section>
+
+<section>
+  <h2>Categories</h2>
+  {# Standalone forms; cell inputs/buttons reference them via the HTML5 form= attribute
+     (a <form> can't legally wrap <td>s). #}
+  {% for c in categories %}
+  <form id="catedit-{{ c.rid }}" method="post" action="/admin/categories/{{ c.rid }}/edit">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="family_rid" value="{{ family.rid }}">
+  </form>
+  <form id="catdel-{{ c.rid }}" method="post" action="/admin/categories/{{ c.rid }}/delete"
+        onsubmit="return confirm('Delete this category? Its transactions become uncategorized.');">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="family_rid" value="{{ family.rid }}">
+  </form>
+  {% endfor %}
+  <div class="dt-scroll">
+    <table>
+      <thead><tr><th>Name</th><th>Kind</th><th>Icon</th><th>Color</th><th></th></tr></thead>
+      <tbody>
+        {% for c in categories %}
+        <tr>
+          <td><input form="catedit-{{ c.rid }}" name="name" value="{{ c.name }}" style="min-width:120px;"></td>
+          <td>{{ c.kind }}</td>
+          <td><input form="catedit-{{ c.rid }}" name="icon" value="{{ c.icon or '' }}" style="width:60px;"></td>
+          <td><input form="catedit-{{ c.rid }}" name="color" value="{{ c.color or '' }}" style="width:80px;"></td>
+          <td style="white-space:nowrap;">
+            <button class="btn" type="submit" form="catedit-{{ c.rid }}" style="padding:3px 9px;">Save</button>
+            <button class="btn btn-danger" type="submit" form="catdel-{{ c.rid }}" style="padding:3px 9px;">Delete</button>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not categories %}<tr><td colspan="5" class="empty">No categories.</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="/admin/families/{{ family.rid }}/categories" class="toolbar" style="align-items:flex-end; margin-top:12px;">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="field" style="margin:0;"><label>New category</label><input name="name" placeholder="name" required></div>
+    <div class="field" style="margin:0;"><label>Kind</label>
+      <select name="kind">{% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}</select></div>
+    <div class="field" style="margin:0;"><label>Icon</label><input name="icon" style="width:70px;"></div>
+    <div class="field" style="margin:0;"><label>Color</label><input name="color" style="width:90px;" placeholder="#5B5BF0"></div>
+    <button class="btn-primary" type="submit">Add</button>
+  </form>
+</section>
+
+<section>
+  <h2>Budgets <span class="who">(monthly limit, in VND)</span></h2>
+  {% for b in budgets %}
+  <form id="budedit-{{ b.rid }}" method="post" action="/admin/budgets/{{ b.rid }}/edit">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="family_rid" value="{{ family.rid }}">
+  </form>
+  <form id="buddel-{{ b.rid }}" method="post" action="/admin/budgets/{{ b.rid }}/delete"
+        onsubmit="return confirm('Delete this budget?');">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="family_rid" value="{{ family.rid }}">
+  </form>
+  {% endfor %}
+  <div class="dt-scroll">
+    <table>
+      <thead><tr><th>Category</th><th>Limit (VND)</th><th></th></tr></thead>
+      <tbody>
+        {% for b in budgets %}
+        <tr>
+          <td>{{ b.category.name if b.category else '—' }}</td>
+          <td><input form="budedit-{{ b.rid }}" name="amount" inputmode="numeric" value="{{ b.amount }}" style="width:140px;"></td>
+          <td style="white-space:nowrap;">
+            <button class="btn" type="submit" form="budedit-{{ b.rid }}" style="padding:3px 9px;">Save</button>
+            <button class="btn btn-danger" type="submit" form="buddel-{{ b.rid }}" style="padding:3px 9px;">Delete</button>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not budgets %}<tr><td colspan="3" class="empty">No budgets.</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="/admin/families/{{ family.rid }}/budgets" class="toolbar" style="align-items:flex-end; margin-top:12px;">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="field" style="margin:0;"><label>New budget — category</label>
+      <select name="category_rid">
+        {% for c in categories if c.kind == 'expense' %}<option value="{{ c.rid }}">{{ c.name }}</option>{% endfor %}
+      </select></div>
+    <div class="field" style="margin:0;"><label>Limit (VND)</label><input name="amount" inputmode="numeric" placeholder="0" required></div>
+    <button class="btn-primary" type="submit">Add</button>
+  </form>
+</section>
+{% endblock %}

@@ -316,10 +316,12 @@ Dockerfile's `COPY app ./app`).
   destructive forms use POST + CSRF + a confirm. Pages get a **breadcrumb** (`crumbs`) and one-shot
   **flash** messages (`flash` / `pop_flashes`, in the session).
 - **Scope so far:** login/logout; dashboard; **Users** (list → detail → edit; soft-delete / restore
-  / reset-password / unlink-Google); per-**wallet** transaction list with **transaction CRUD**; a
-  global **/admin/transactions** (server-side paginated, type filter); read-only **Families** and
-  **Audit** lists. Planned: full Families / Wallets / Categories / Budgets management and an Ops
-  **Dependencies** panel reading GitHub Dependabot alerts for both repos.
+  / reset-password / unlink-Google); per-**wallet** transaction list with **transaction CRUD** +
+  wallet rename / delete; a global **/admin/transactions** (server-side paginated, type filter);
+  **Families** (detail → rename / soft-delete / restore, member + wallet views, and **Categories**
+  and **Budgets** CRUD on the family page); **Audit** log. Categories/budgets edit inline in tables
+  via the HTML5 `form=` attribute (a `<form>` can't wrap `<td>`s). Planned: an Ops **Dependencies**
+  panel reading GitHub Dependabot alerts for both repos (app + backend).
 
 ### Privacy policy (`app/domains/legal/`)
 
