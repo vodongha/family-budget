@@ -9,17 +9,22 @@ from fastapi import APIRouter, HTTPException, status
 from app.core.currency import BASE_CURRENCY
 from app.core.deps import CurrentUser, SessionDep
 from app.domains.rates.repository import RateRepository
-from app.domains.rates.schemas import RatesInfo
+from app.domains.rates.schemas import RateItem, RatesInfo
 from app.domains.rates.tasks import fetch_exchange_rates
 
 router = APIRouter(prefix="/rates", tags=["rates"])
 
 
 def _info(repo: RateRepository) -> RatesInfo:
+    rates = repo.all_rates()
     return RatesInfo(
         base_currency=BASE_CURRENCY,
         updated_at=repo.latest_updated_at(),
         count=repo.count(),
+        rates=[
+            RateItem(currency=code, rate_to_base=rate)
+            for code, rate in sorted(rates.items())
+        ],
     )
 
 
