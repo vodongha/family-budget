@@ -55,6 +55,11 @@ income/expense together, scoped per family.
 - **Transfers** — move money between wallets via linked `transfer_in`/`transfer_out` legs
   (`POST /transfers`, `DELETE /transfers/{group_rid}`); excluded from income/expense totals
 - **Dashboard** — `GET /dashboard/summary`: total income / expense / net + per-wallet balances
+- **Currencies & exchange rates** — each wallet has its own ISO-4217 currency; per-wallet figures
+  stay in it, while cross-wallet **totals** (dashboard / stats / budgets) convert to a chosen
+  **display currency** via `?display_currency=` (default base VND) using stored rates. Rates refresh
+  every 12h (Celery beat) from a free public source; `GET /rates` reports when they were last
+  updated and `POST /rates/refresh` pulls a fresh set on demand. Transfers must share a currency
 - **Multi-tenant isolation** — every query is scoped by `family_id`; one family cannot see another's data
 - **Privacy policy** — `GET /privacy?lang=vi|en` serves a public, bilingual HTML page (the
   Google Play store-listing URL; also embedded in-app via a WebView)
@@ -69,8 +74,10 @@ auto-categorize (merchant dictionary + Ollama). See the roadmap in [CLAUDE.md](C
 
 ## Money rules (non-negotiable)
 
-- Amounts are **integer minor units** (đồng) — never `float`. Direction comes from the
-  transaction `type`, not the sign of the amount.
+- Amounts are **integer minor units** of the wallet's own currency — never `float`. Direction
+  comes from the transaction `type`, not the sign of the amount.
+- Cross-wallet totals are converted to a single currency (base, or the request's display currency);
+  **never sum raw minor units across currencies.**
 - Wallet balance is **derived** from the sum of transactions, never stored stale.
 - Every scoped query filters by **`family_id`** (the tenant boundary).
 - Identifiers: numeric `id` (internal PK, Oracle `Identity()`) + `rid` ULID (external).
