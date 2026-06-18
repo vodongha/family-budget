@@ -11,7 +11,7 @@
       --border: #30363d; --text: #e6edf3; --muted: #8b949e;
       --primary: #6e7bf2; --accent: #2f81f7;
       --danger: #f85149; --warn: #d29922; --ok: #3fb950;
-      --radius: 10px; --sidebar-w: 240px;
+      --radius: 10px; --sidebar-w: 240px; --rail-w: 64px;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; }
@@ -27,44 +27,63 @@
     .sidebar {
       width: var(--sidebar-w); flex: 0 0 var(--sidebar-w);
       background: var(--surface); border-right: 1px solid var(--border);
-      padding: 16px 12px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
-      transition: margin-left .2s ease, transform .2s ease;
+      padding: 12px 10px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+      transition: width .2s ease, flex-basis .2s ease, transform .2s ease;
     }
     .main { flex: 1; min-width: 0; padding: 20px 24px 56px; }
-    .brand { font-weight: 800; font-size: 18px; padding: 4px 8px 14px; letter-spacing: -.3px; }
-    .brand span { color: var(--primary); }
 
-    /* ---- grouped icon nav ---- */
-    .nav-group { margin-top: 16px; }
+    .sb-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 12px; gap: 6px; }
+    .brand { font-weight: 800; font-size: 18px; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; }
+    .brand .full span { color: var(--primary); }
+    .brand .mark { display: none; color: var(--primary); }
+
+    /* ---- grouped, collapsible icon nav ---- */
+    .nav-group { margin-top: 12px; }
     .nav-group:first-of-type { margin-top: 2px; }
-    .grp-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 6px 10px 4px; }
+    .grp-label {
+      display: flex; align-items: center; justify-content: space-between; width: 100%;
+      background: none; border: none; color: var(--muted); font: inherit; font-size: 11px;
+      text-transform: uppercase; letter-spacing: .06em; padding: 6px 10px 4px; cursor: pointer;
+    }
+    .grp-label::after { content: '▾'; font-size: 10px; transition: transform .15s; }
+    .nav-group.collapsed .grp-label::after { transform: rotate(-90deg); }
+    .nav-group.collapsed .grp-items { display: none; }
     .nav a {
       display: flex; align-items: center; gap: 10px;
-      padding: 9px 10px; border-radius: 8px; color: var(--text); margin-bottom: 2px;
+      padding: 9px 10px; border-radius: 8px; color: var(--text); margin-bottom: 2px; white-space: nowrap;
     }
     .nav a:hover { background: var(--surface-2); text-decoration: none; }
     .nav a.active { background: var(--surface-2); color: var(--primary); font-weight: 600; }
     .nav a svg { width: 16px; height: 16px; flex: 0 0 16px; }
 
-    /* ---- collapse (desktop) ---- */
-    body.sb-collapsed .sidebar { margin-left: calc(-1 * var(--sidebar-w)); }
-    .sb-backdrop { display: none; }
+    /* ---- rail (collapsed) mode, desktop: icons only ---- */
+    body.sb-collapsed .sidebar { width: var(--rail-w); flex-basis: var(--rail-w); }
+    body.sb-collapsed .brand .full { display: none; }
+    body.sb-collapsed .brand .mark { display: inline; }
+    body.sb-collapsed .sb-head { justify-content: center; }
+    body.sb-collapsed .grp-label { display: none; }
+    body.sb-collapsed .grp-items { display: block !important; }
+    body.sb-collapsed .nav a { justify-content: center; padding: 10px 0; }
+    body.sb-collapsed .nav a span { display: none; }
+    body.sb-collapsed .sb-rail svg { transform: rotate(180deg); }
 
     /* ---- topbar ---- */
     .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
     .topbar h1 { font-size: 20px; margin: 0; flex: 1; min-width: 0; }
     .icon-btn {
       background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-      width: 36px; height: 36px; border-radius: 8px; cursor: pointer; display: inline-flex;
-      align-items: center; justify-content: center; flex: 0 0 auto;
+      width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: inline-flex;
+      align-items: center; justify-content: center; flex: 0 0 auto; padding: 0;
     }
     .icon-btn:hover { border-color: var(--muted); }
+    .icon-btn svg { width: 16px; height: 16px; transition: transform .2s; }
     .who { color: var(--muted); font-size: 13px; }
     .btn { background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
       padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; }
     .btn:hover { border-color: var(--muted); }
     .btn:disabled { opacity: .4; cursor: default; }
     .btn-danger { color: var(--danger); border-color: var(--danger); }
+    .sb-burger { display: none; }
 
     /* ---- cards ---- */
     .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
@@ -76,7 +95,9 @@
     section h2 { font-size: 15px; color: var(--muted); font-weight: 600; margin: 0 0 12px; }
 
     /* ---- tables / datatable ---- */
-    .dt-bar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    .dt-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .dt-left { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+    .dt-size { padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font: inherit; }
     .dt-search { padding: 7px 11px; background: var(--bg); border: 1px solid var(--border);
       border-radius: 8px; color: var(--text); font: inherit; min-width: 200px; }
     .dt-scroll { overflow-x: auto; border-radius: var(--radius); }
@@ -98,33 +119,36 @@
     .empty { color: var(--muted); padding: 14px; }
     code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }
 
-    /* ---- mobile: sidebar becomes an off-canvas drawer ---- */
+    /* ---- desktop vs mobile toggle visibility ---- */
+    @media (min-width: 861px) { .sb-burger { display: none !important; } }
     @media (max-width: 860px) {
+      .sb-rail { display: none !important; }
+      .sb-burger { display: inline-flex; }
       .sidebar {
-        position: fixed; top: 0; left: 0; height: 100vh; z-index: 50;
-        transform: translateX(-100%); margin-left: 0 !important; box-shadow: 2px 0 16px rgba(0,0,0,.4);
+        position: fixed; top: 0; left: 0; height: 100vh; z-index: 50; width: var(--sidebar-w); flex-basis: var(--sidebar-w);
+        transform: translateX(-100%); box-shadow: 2px 0 16px rgba(0,0,0,.4);
       }
       body.sb-open .sidebar { transform: translateX(0); }
+      /* On mobile the drawer always shows full labels, ignoring desktop rail. */
+      body.sb-collapsed .sidebar { width: var(--sidebar-w); flex-basis: var(--sidebar-w); }
+      body.sb-collapsed .brand .full { display: inline; }
+      body.sb-collapsed .brand .mark { display: none; }
+      body.sb-collapsed .grp-label { display: flex; }
+      body.sb-collapsed .nav a { justify-content: flex-start; padding: 9px 10px; }
+      body.sb-collapsed .nav a span { display: inline; }
       .sb-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 40; }
       body.sb-open .sb-backdrop { display: block; }
       .main { padding: 16px 16px 56px; }
-      .dt-search { min-width: 0; width: 100%; }
-      .dt-bar { justify-content: stretch; }
+      .dt-search { min-width: 0; flex: 1; }
     }
+    .sb-backdrop { display: none; }
   </style>
-  <script>
-    // Restore the desktop collapsed state before paint to avoid a flash.
-    try { if (localStorage.getItem('admin_sb') === '1') document.documentElement.classList.add('pre-collapsed'); } catch (e) {}
-  </script>
-  <style>html.pre-collapsed body.has-sidebar .sidebar { margin-left: calc(-1 * var(--sidebar-w)); }</style>
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
 {% block body %}{% endblock %}
 <script>
 (function () {
-  // Apply restored collapse state to the body now that it exists.
   try { if (localStorage.getItem('admin_sb') === '1') document.body.classList.add('sb-collapsed'); } catch (e) {}
-  document.documentElement.classList.remove('pre-collapsed');
 
   window.toggleSidebar = function () {
     if (window.matchMedia('(max-width: 860px)').matches) {
@@ -134,10 +158,33 @@
       try { localStorage.setItem('admin_sb', c ? '1' : '0'); } catch (e) {}
     }
   };
+
+  // Collapsible nav groups (accordion), persisted by data-group key.
+  window.toggleGroup = function (btn) {
+    var g = btn.closest('.nav-group');
+    g.classList.toggle('collapsed');
+    try {
+      var collapsed = [];
+      document.querySelectorAll('.nav-group.collapsed').forEach(function (x) {
+        if (x.dataset.group) collapsed.push(x.dataset.group);
+      });
+      localStorage.setItem('admin_groups', JSON.stringify(collapsed));
+    } catch (e) {}
+  };
+  try {
+    var raw = localStorage.getItem('admin_groups');
+    if (raw) {
+      var collapsed = JSON.parse(raw);
+      document.querySelectorAll('.nav-group').forEach(function (g) {
+        if (collapsed.indexOf(g.dataset.group) >= 0) g.classList.add('collapsed');
+      });
+    }
+  } catch (e) {}
+
   var backdrop = document.querySelector('.sb-backdrop');
   if (backdrop) backdrop.addEventListener('click', function () { document.body.classList.remove('sb-open'); });
 
-  // --- self-contained datatable: sort / search / paginate (no dependencies) ---
+  // --- self-contained datatable: page-size / sort / search / paginate ---
   function initDataTable(table) {
     if (!table.tHead || !table.tBodies.length) return;
     var rows = Array.prototype.slice.call(table.tBodies[0].rows);
@@ -148,9 +195,27 @@
     var wrap = document.createElement('div'); wrap.className = 'dt-wrap';
     table.parentNode.insertBefore(wrap, table);
     var bar = document.createElement('div'); bar.className = 'dt-bar';
+
+    // page-size selector (left)
+    var left = document.createElement('div'); left.className = 'dt-left';
+    var lab = document.createElement('span'); lab.textContent = 'Show'; left.appendChild(lab);
+    var sel = document.createElement('select'); sel.className = 'dt-size';
+    var sizes = [10, 25, 50, 100];
+    if (sizes.indexOf(perPage) < 0) { sizes.push(perPage); sizes.sort(function (a, b) { return a - b; }); }
+    sizes.forEach(function (n) {
+      var o = document.createElement('option'); o.value = n; o.textContent = n;
+      if (n === perPage) o.selected = true; sel.appendChild(o);
+    });
+    left.appendChild(sel);
+    var per = document.createElement('span'); per.textContent = 'per page'; left.appendChild(per);
+    bar.appendChild(left);
+
+    // search (right)
     var search = document.createElement('input');
     search.type = 'search'; search.placeholder = 'Search…'; search.className = 'dt-search';
-    bar.appendChild(search); wrap.appendChild(bar);
+    bar.appendChild(search);
+    wrap.appendChild(bar);
+
     var scroll = document.createElement('div'); scroll.className = 'dt-scroll';
     scroll.appendChild(table); wrap.appendChild(scroll);
     var foot = document.createElement('div'); foot.className = 'dt-foot'; wrap.appendChild(foot);
@@ -164,6 +229,7 @@
       });
     });
     search.addEventListener('input', function () { state.q = search.value.toLowerCase(); state.page = 1; render(); });
+    sel.addEventListener('change', function () { perPage = parseInt(sel.value, 10); state.page = 1; render(); });
 
     function txt(r, i) { return (r.cells[i] ? r.cells[i].innerText : '').trim(); }
     function asNum(v) { var n = parseFloat(v.replace(/[^0-9.\-]/g, '')); return isNaN(n) ? null : n; }
