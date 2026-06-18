@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
+from app.domains.admin.router import setup_admin
 from app.domains.auth.router import router as auth_router
 from app.domains.budgets.router import router as budgets_router
 from app.domains.categories.router import router as categories_router
@@ -180,6 +181,11 @@ app.include_router(rates_router)
 )
 def meta() -> dict[str, str]:
     return {"app": "family-budget", "env": settings.env}
+
+
+# Admin panel at /admin (session-authenticated, server-rendered). Wired before
+# the SPA mount so its routes win over the catch-all static mount at "/".
+setup_admin(app)
 
 
 # Serve the built Flutter web client at "/" (same origin as the API). Mounted

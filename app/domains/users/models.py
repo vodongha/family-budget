@@ -68,6 +68,12 @@ class User(Base):
     role: Mapped[str] = mapped_column(
         String(10), server_default=text("'member'"), default=UserRole.MEMBER.value
     )
+    # Platform super-admin (the /admin panel), independent of the family-scoped
+    # role above. Bootstrapped via app.scripts.create_admin, never through the
+    # public API. server_default keeps every existing account a non-admin.
+    is_superadmin: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("0"), default=False, nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     # Soft delete (Google Play account-deletion policy): set on self-deletion;
     # login and token validation reject deleted users immediately. A scheduled

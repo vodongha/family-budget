@@ -134,9 +134,9 @@ family-budget/
 ### Domains
 
 Built: `users`, `auth`, `families`, `invitations`, `categories`, `wallets`, `transactions`,
-`transfers`, `budgets`, `dashboard`, `stats`, `account`, `legal`, `health`. Planned: `reports`,
-`ocr`, `ai`. Each follows the same `router / service / repository / schemas / models (/ tasks for
-Celery)` layout (`legal` is router-only — it serves a static HTML page, no DB).
+`transfers`, `budgets`, `dashboard`, `stats`, `account`, `legal`, `admin`, `health`. Planned:
+`reports`, `ocr`, `ai`. Each follows the same `router / service / repository / schemas / models
+(/ tasks for Celery)` layout (`legal` is router-only — it serves a static HTML page, no DB).
 
 ## Architecture & conventions
 
@@ -273,6 +273,36 @@ owner-managed. Each wallet also carries an optional **`icon`** (emoji) and
 **`color`** (hex). `PATCH /wallets/{rid}` edits name/icon/color with the **same
 permission as delete** (family wallet → family owner or creator, personal wallet →
 its owner); visibility is immutable.
+
+### Admin panel (`app/domains/admin/`)
+
+A **server-rendered** (Jinja2 + signed-cookie session), super-admin-only console at **`/admin`**,
+separate from the JWT-authenticated API and from the Flutter SPA. `setup_admin(app)` in
+`router.py` is called from `main.py` **before** the `StaticFiles` mount at `/`, so `/admin*` wins
+over the SPA catch-all. Templates live in `app/domains/admin/templates/` (shipped via the
+Dockerfile's `COPY app ./app`).
+
+- **Super-admin identity** is a new `users.is_superadmin` flag (migration `c1d2e3f4a5b6`),
+  **independent of** the family-scoped `owner`/`member` role. An admin is a normal `users` row
+  with `family_id = NULL` + `is_superadmin = 1`. **Never settable via the public API** — only via
+  the bootstrap CLI `python -m app.scripts.create_admin --email … --name …` (password from the
+  `ADMIN_PASSWORD` env var or an interactive prompt; on Fly run it with `fly ssh console -a famo
+  -C "…"`). Running it on an existing email **promotes** that account.
+- **Auth** is a Starlette `SessionMiddleware` signed cookie (`famo_admin`), keyed by
+  `ADMIN_SESSION_SECRET` (settings, default placeholder — **set a strong value in prod**). The
+  session stores only the admin's `rid`; `require_admin` (`security.py`) re-loads and re-checks
+  `is_superadmin and not is_deleted` on every request, so revoking admin or deleting the account
+  kills a live session. Unauthenticated hits raise `AdminLoginRequired` → a 303 redirect to
+  `/admin/login`. Every mutating form carries a session **CSRF** token (`verify_csrf`).
+- **Cross-tenant by design.** `AdminRepository` deliberately bypasses the `family_id` boundary
+  (platform-wide counts, every user/family). It is the **only** repository allowed to do so and
+  must stay behind `require_admin`.
+- **Audit log** — `admin_audit_log` (model in `admin/models.py`) records every admin mutation
+  (actor, action, target, JSON detail). Call `AdminService.log(...)` after a successful mutation.
+- **Scope so far (Step 1):** login/logout + dashboard (platform metrics + recent audit). Planned:
+  user/family management (edit / soft-delete / restore / purge), an audit viewer, and an Ops
+  **Dependencies** panel that reads GitHub Dependabot alerts for both repos (app + backend) to flag
+  outdated / vulnerable libraries.
 
 ### Privacy policy (`app/domains/legal/`)
 
@@ -468,8 +498,9 @@ Production runs on **Fly.io**, region `sin` (Singapore — closest to ADB), doma
 - **Redis:** external (Celery broker). Provision Upstash via `fly redis create` and set
   `REDIS_URL`. The API itself never touches Redis — only the worker does.
 - **Secrets** (set with `fly secrets set`, never committed): `ORACLE_PASSWORD`, `WALLET_PASSWORD`,
-  `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `REDIS_URL`, and the three `WALLET_*_B64`. See the README
-  "Deploy (Fly.io)" section for the exact one-time commands.
+  `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `REDIS_URL`, `ADMIN_SESSION_SECRET` (signs the `/admin` session
+  cookie), and the three `WALLET_*_B64`. See the README "Deploy (Fly.io)" section for the exact
+  one-time commands.
 
 ## Gotchas (learned the hard way — read before debugging these)
 

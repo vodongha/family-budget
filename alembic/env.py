@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.database import Base, get_engine
 
 # Import models so their tables are registered on Base.metadata for autogenerate.
+from app.domains.admin import models as admin_models  # noqa: F401
 from app.domains.invitations import models as invitation_models  # noqa: F401
 from app.domains.transactions import models as transaction_models  # noqa: F401
 from app.domains.users import models as user_models  # noqa: F401
