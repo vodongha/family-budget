@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 365 * 10
 
+    # Admin panel (/admin) — a server-rendered, session-cookie-authenticated
+    # surface, separate from the app's JWT. Set a strong random value in
+    # production; the signed session cookie is only as safe as this secret.
+    admin_session_secret: str = "change-me-admin"
+    # Idle lifetime of the admin session cookie, in seconds (default 8 hours).
+    admin_session_max_age: int = 60 * 60 * 8
+
     # Infra
     redis_url: str = "redis://redis:6379/0"
     env: str = "development"

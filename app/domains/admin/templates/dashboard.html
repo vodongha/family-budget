@@ -1,0 +1,58 @@
+{% extends "shell.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block content %}
+<div class="cards">
+  <div class="card">
+    <div class="label">Users</div>
+    <div class="value">{{ metrics.users_active }}</div>
+    <div class="sub">{{ metrics.users_total }} total · {{ metrics.users_deleted }} deleted</div>
+  </div>
+  <div class="card">
+    <div class="label">Families</div>
+    <div class="value">{{ metrics.families_active }}</div>
+    <div class="sub">{{ metrics.families_total }} total · {{ metrics.families_deleted }} deleted</div>
+  </div>
+  <div class="card">
+    <div class="label">Wallets</div>
+    <div class="value">{{ metrics.wallets_total }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Transactions</div>
+    <div class="value">{{ metrics.transactions_total }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Admins</div>
+    <div class="value">{{ metrics.admins }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Rates updated</div>
+    <div class="value" style="font-size:18px;">
+      {{ rates_updated_at.strftime('%d/%m %H:%M') if rates_updated_at else '—' }}
+    </div>
+    <div class="sub">{{ 'fresh' if rates_updated_at else 'never refreshed' }}</div>
+  </div>
+</div>
+
+<section>
+  <h2>Recent admin activity</h2>
+  {% if recent_audit %}
+  <table>
+    <thead>
+      <tr><th>When</th><th>Action</th><th>Target</th></tr>
+    </thead>
+    <tbody>
+      {% for a in recent_audit %}
+      <tr>
+        <td>{{ a.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td><code>{{ a.action }}</code></td>
+        <td>{{ a.target_type or '' }} {{ a.target_rid or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No admin actions recorded yet.</div>
+  {% endif %}
+</section>
+{% endblock %}

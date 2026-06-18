@@ -63,6 +63,10 @@ income/expense together, scoped per family.
 - **Multi-tenant isolation** — every query is scoped by `family_id`; one family cannot see another's data
 - **Privacy policy** — `GET /privacy?lang=vi|en` serves a public, bilingual HTML page (the
   Google Play store-listing URL; also embedded in-app via a WebView)
+- **Admin panel** — a server-rendered, super-admin-only console at `/admin` (session cookie,
+  separate from the API JWT and the web app). Platform dashboard + audit log now; user/family
+  management and a dependency-freshness panel planned. Admins are bootstrapped with
+  `python -m app.scripts.create_admin` — never via the public API
 - **Health** — `GET /health` runs `SELECT 1 FROM dual` to verify the ADB connection
 
 ### Planned
@@ -228,6 +232,7 @@ fly redis create                               # Upstash Redis → gives a REDIS
 fly secrets set \
   ORACLE_PASSWORD=... WALLET_PASSWORD=... \
   JWT_SECRET="$(openssl rand -hex 32)" \
+  ADMIN_SESSION_SECRET="$(openssl rand -hex 32)" \
   GOOGLE_CLIENT_ID="...apps.googleusercontent.com" \
   REDIS_URL="rediss://...upstash..." --app famo
 
@@ -246,6 +251,16 @@ fly tokens create deploy --app famo
 
 `ENV` and `WALLET_DIR` come from `fly.toml`; everything secret comes from `fly secrets`. Tighten
 `CORSMiddleware` in `app/main.py` to the web client's real origin for production.
+
+**Bootstrap the first admin** (once, after the admin migration has deployed):
+
+```bash
+fly ssh console -a famo -C \
+  "python -m app.scripts.create_admin --email you@example.com --name 'Your Name'"
+# Set ADMIN_PASSWORD in the machine env first, or run without -C for the interactive prompt.
+```
+
+The `/admin` console is then reachable at `https://famo.io.vn/admin`.
 
 ---
 
