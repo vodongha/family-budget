@@ -2,7 +2,7 @@
 {% block bodyclass %}has-sidebar{% endblock %}
 
 {% macro navlink(href, key, label, icon) %}
-  <a href="{{ href }}" class="{{ 'active' if active == key else '' }}">{{ icon|safe }}<span>{{ label }}</span></a>
+  <a href="{{ href }}" class="{{ 'active' if active == key else '' }}" title="{{ label }}">{{ icon|safe }}<span>{{ label }}</span></a>
 {% endmacro %}
 
 {% set ic_dash = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg>' %}
@@ -11,24 +11,34 @@
 {% set ic_audit = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="1.8" width="11" height="12.4" rx="1.2"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>' %}
 {% set ic_logout = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2.5H3.2A1.2 1.2 0 0 0 2 3.7v8.6a1.2 1.2 0 0 0 1.2 1.2H6"/><path d="M9.5 11 13 8 9.5 5M13 8H6"/></svg>' %}
 {% set ic_menu = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>' %}
+{% set ic_collapse = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3.5 5.5 8 10 12.5"/><path d="M13.5 3.5 9 8l4.5 4.5"/></svg>' %}
 
 {% block body %}
 <div class="app">
   <aside class="sidebar">
-    <div class="brand">Famo <span>Admin</span></div>
+    <div class="sb-head">
+      <div class="brand"><span class="full">Famo <span>Admin</span></span><span class="mark">F</span></div>
+      <button class="icon-btn sb-rail" type="button" onclick="toggleSidebar()" title="Collapse sidebar" aria-label="Collapse sidebar">{{ ic_collapse|safe }}</button>
+    </div>
     <nav class="nav">
-      <div class="nav-group">
-        <div class="grp-label">Overview</div>
-        {{ navlink('/admin', 'dashboard', 'Dashboard', ic_dash) }}
+      <div class="nav-group" data-group="overview">
+        <button class="grp-label" type="button" onclick="toggleGroup(this)">Overview</button>
+        <div class="grp-items">
+          {{ navlink('/admin', 'dashboard', 'Dashboard', ic_dash) }}
+        </div>
       </div>
-      <div class="nav-group">
-        <div class="grp-label">Manage</div>
-        {{ navlink('/admin/users', 'users', 'Users', ic_users) }}
-        {{ navlink('/admin/families', 'families', 'Families', ic_family) }}
+      <div class="nav-group" data-group="manage">
+        <button class="grp-label" type="button" onclick="toggleGroup(this)">Manage</button>
+        <div class="grp-items">
+          {{ navlink('/admin/users', 'users', 'Users', ic_users) }}
+          {{ navlink('/admin/families', 'families', 'Families', ic_family) }}
+        </div>
       </div>
-      <div class="nav-group">
-        <div class="grp-label">System</div>
-        {{ navlink('/admin/audit', 'audit', 'Audit log', ic_audit) }}
+      <div class="nav-group" data-group="system">
+        <button class="grp-label" type="button" onclick="toggleGroup(this)">System</button>
+        <div class="grp-items">
+          {{ navlink('/admin/audit', 'audit', 'Audit log', ic_audit) }}
+        </div>
       </div>
     </nav>
   </aside>
@@ -36,7 +46,7 @@
 
   <main class="main">
     <div class="topbar">
-      <button class="icon-btn" type="button" onclick="toggleSidebar()" aria-label="Toggle menu">{{ ic_menu|safe }}</button>
+      <button class="icon-btn sb-burger" type="button" onclick="toggleSidebar()" aria-label="Open menu">{{ ic_menu|safe }}</button>
       <h1>{% block heading %}{% endblock %}</h1>
       <span class="who">{{ admin.email }}</span>
       <form method="post" action="/admin/logout" style="margin:0;">
