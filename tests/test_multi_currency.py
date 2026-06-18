@@ -25,6 +25,17 @@ def _new_wallet(client: TestClient, headers: dict[str, str], **body: object) -> 
     return resp.json()
 
 
+def test_supported_currencies_expanded() -> None:
+    from app.core.currency import decimals, is_supported
+
+    # A broad world set is supported, with correct ISO-4217 decimals.
+    assert is_supported("CAD") and is_supported("CHF") and is_supported("KWD")
+    assert decimals("KWD") == 3  # three-decimal Gulf currency
+    assert decimals("CLP") == 0  # zero-decimal
+    assert decimals("CAD") == 2
+    assert not is_supported("ZZZ")
+
+
 def test_convert_minor_math() -> None:
     # Base currency is unchanged.
     assert convert_minor(123, "VND", 1.0) == 123
