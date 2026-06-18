@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Response, status
 
-from app.core.deps import CurrentUser, OptionalFamily, SessionDep
+from app.core.deps import CurrentUser, DisplayCurrency, OptionalFamily, SessionDep
 from app.domains.budgets.models import Budget
 from app.domains.budgets.schemas import BudgetCreate, BudgetRead, BudgetUpdate
 from app.domains.budgets.service import (
@@ -18,11 +18,12 @@ from app.domains.wallets.models import WalletScope
 router = APIRouter(prefix="/budgets", tags=["budgets"])
 
 
-def _to_read(budget: Budget, spent: int) -> BudgetRead:
+def _to_read(budget: Budget, amount: int, spent: int) -> BudgetRead:
+    # `amount`/`spent` are already in the request's display currency.
     return BudgetRead(
         rid=budget.rid,
         category=CategoryRead.model_validate(budget.category),
-        amount=budget.amount,
+        amount=amount,
         spent=spent,
     )
 
@@ -32,14 +33,16 @@ def list_budgets(
     session: SessionDep,
     family_id: OptionalFamily,
     current_user: CurrentUser,
+    display_currency: DisplayCurrency,
     scope: WalletScope = WalletScope.PERSONAL,
 ) -> list[BudgetRead]:
     """Category budgets with the current month's `spent`, for the given `scope`
-    (`personal` / `family`). `spent` is derived over that scope's wallets."""
+    (`personal` / `family`). `spent` is derived over that scope's wallets. Limits
+    and spend are rendered in `display_currency`."""
     items = BudgetService(session).list_with_spent(
-        family_id, current_user.id, scope.value
+        family_id, current_user.id, scope.value, display_currency
     )
-    return [_to_read(b, spent) for b, spent in items]
+    return [_to_read(b, amount, spent) for b, amount, spent in items]
 
 
 @router.post(
@@ -53,18 +56,20 @@ def create_budget(
     session: SessionDep,
     family_id: OptionalFamily,
     current_user: CurrentUser,
+    display_currency: DisplayCurrency,
     scope: WalletScope = WalletScope.PERSONAL,
 ) -> BudgetRead:
     """Set a monthly limit for one category in `scope` (`personal` default, or
-    `family` — requires a family). `404` if the category isn't visible, `409` if
-    it already has a budget in this scope."""
+    `family` — requires a family). The `amount` is in `display_currency`. `404` if
+    the category isn't visible, `409` if it already has a budget in this scope."""
     try:
-        budget, spent = BudgetService(session).create(
+        budget, amount, spent = BudgetService(session).create(
             family_id,
             current_user.id,
             scope.value,
             payload.category_rid,
             payload.amount,
+            display_currency,
         )
     except CategoryNotFoundError:
         raise HTTPException(
@@ -80,7 +85,7 @@ def create_budget(
             status_code=status.HTTP_409_CONFLICT,
             detail="This category already has a budget",
         ) from None
-    return _to_read(budget, spent)
+    return _to_read(budget, amount, spent)
 
 
 @router.patch("/{rid}", response_model=BudgetRead, summary="Update a budget")
@@ -90,17 +95,19 @@ def update_budget(
     session: SessionDep,
     family_id: OptionalFamily,
     current_user: CurrentUser,
+    display_currency: DisplayCurrency,
 ) -> BudgetRead:
-    """Change a budget's monthly `amount`. `404` if it isn't visible to you."""
+    """Change a budget's monthly `amount` (in `display_currency`). `404` if it
+    isn't visible to you."""
     try:
-        budget, spent = BudgetService(session).update(
-            family_id, current_user.id, rid, payload.amount
+        budget, amount, spent = BudgetService(session).update(
+            family_id, current_user.id, rid, payload.amount, display_currency
         )
     except BudgetNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Budget not found"
         ) from None
-    return _to_read(budget, spent)
+    return _to_read(budget, amount, spent)
 
 
 @router.delete(

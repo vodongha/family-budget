@@ -5,6 +5,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.core.currency import BASE_CURRENCY
 from app.domains.budgets.models import Budget
 from app.domains.budgets.repository import BudgetRepository
 from app.domains.categories.repository import CategoryRepository
@@ -64,13 +65,27 @@ class BudgetService:
         return totals
 
     def list_with_spent(
-        self, family_id: int | None, user_id: int, scope: str
-    ) -> list[tuple[Budget, int]]:
+        self,
+        family_id: int | None,
+        user_id: int,
+        scope: str,
+        display_currency: str = BASE_CURRENCY,
+    ) -> list[tuple[Budget, int, int]]:
+        """Each budget with its current-month spend, both rendered in
+        ``display_currency`` (stored limits are in the base currency)."""
         budgets = self._repo.list(family_id, user_id, scope)
         wallet_ids = self._wallets.visible_wallet_ids(family_id, user_id, scope)
         start, end = _current_month_range()
         spent = self._spent_base_by_category(wallet_ids, start, end)
-        return [(b, spent.get(b.category_id, 0)) for b in budgets]
+        converter = CurrencyConverter(self._session, display_currency)
+        return [
+            (
+                b,
+                converter.base_to_target(b.amount),
+                converter.base_to_target(spent.get(b.category_id, 0)),
+            )
+            for b in budgets
+        ]
 
     def create(
         self,
@@ -79,7 +94,11 @@ class BudgetService:
         scope: str,
         category_rid: str,
         amount: int,
-    ) -> tuple[Budget, int]:
+        display_currency: str = BASE_CURRENCY,
+    ) -> tuple[Budget, int, int]:
+        """``amount`` arrives in ``display_currency`` minor units and is stored in
+        the base currency. Returns the budget plus its limit and spend rendered
+        back in ``display_currency``."""
         category = self._categories.get_visible_by_rid(
             family_id, user_id, category_rid
         )
@@ -99,23 +118,31 @@ class BudgetService:
             is not None
         ):
             raise DuplicateBudgetError(category_rid)
+        converter = CurrencyConverter(self._session, display_currency)
+        base_amount = converter.to_base(amount, display_currency)
         budget = self._repo.add(
-            budget_family_id, owner_user_id, category.id, amount, user_id
+            budget_family_id, owner_user_id, category.id, base_amount, user_id
         )
         self._session.commit()
         self._session.refresh(budget)
-        return budget, self._month_spent(family_id, user_id, budget)
+        return self._render(family_id, user_id, budget, converter)
 
     def update(
-        self, family_id: int | None, user_id: int, rid: str, amount: int
-    ) -> tuple[Budget, int]:
+        self,
+        family_id: int | None,
+        user_id: int,
+        rid: str,
+        amount: int,
+        display_currency: str = BASE_CURRENCY,
+    ) -> tuple[Budget, int, int]:
         budget = self._repo.get_visible_by_rid(family_id, user_id, rid)
         if budget is None:
             raise BudgetNotFoundError(rid)
-        budget.amount = amount
+        converter = CurrencyConverter(self._session, display_currency)
+        budget.amount = converter.to_base(amount, display_currency)
         self._session.commit()
         self._session.refresh(budget)
-        return budget, self._month_spent(family_id, user_id, budget)
+        return self._render(family_id, user_id, budget, converter)
 
     def delete(self, family_id: int | None, user_id: int, rid: str) -> None:
         budget = self._repo.get_visible_by_rid(family_id, user_id, rid)
@@ -124,7 +151,21 @@ class BudgetService:
         self._repo.delete(budget)
         self._session.commit()
 
-    def _month_spent(
+    def _render(
+        self,
+        family_id: int | None,
+        user_id: int,
+        budget: Budget,
+        converter: CurrencyConverter,
+    ) -> tuple[Budget, int, int]:
+        """(budget, limit, spent) with the two amounts in the display currency."""
+        return (
+            budget,
+            converter.base_to_target(budget.amount),
+            converter.base_to_target(self._month_spent_base(family_id, user_id, budget)),
+        )
+
+    def _month_spent_base(
         self, family_id: int | None, user_id: int, budget: Budget
     ) -> int:
         wallet_ids = self._wallets.visible_wallet_ids(

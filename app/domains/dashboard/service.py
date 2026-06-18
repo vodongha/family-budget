@@ -6,6 +6,7 @@ so a household with mixed-currency wallets gets one meaningful number."""
 
 from sqlalchemy.orm import Session
 
+from app.core.currency import BASE_CURRENCY
 from app.domains.rates.service import CurrencyConverter
 from app.domains.transactions.models import TransactionType
 from app.domains.transactions.repository import TransactionRepository
@@ -20,16 +21,21 @@ class DashboardService:
         self._transactions = TransactionRepository(session)
 
     def summary(
-        self, family_id: int | None, user_id: int, scope: str = WalletScope.ALL.value
+        self,
+        family_id: int | None,
+        user_id: int,
+        scope: str = WalletScope.ALL.value,
+        display_currency: str = BASE_CURRENCY,
     ) -> tuple[int, int, list[tuple[Wallet, int, int]]]:
         """Return (total_income, total_expense, [(wallet, balance, txn_count), ...])
         over the wallets the caller may see under ``scope``. Per-wallet balances
-        are in the wallet's own currency; the totals are in the base currency.
-        Works without a family (personal scope)."""
+        are in the wallet's own currency; the totals are converted to
+        ``display_currency`` (default base). Works without a family (personal
+        scope)."""
         wallets = self._wallets.list_with_balances(family_id, user_id, scope)
         ids = [wallet.id for wallet, _, _ in wallets]
         by_wallet = self._transactions.totals_by_wallet(ids)
-        converter = CurrencyConverter(self._session)
+        converter = CurrencyConverter(self._session, display_currency)
         total_income = 0
         total_expense = 0
         for wallet, _balance, _count in wallets:
@@ -47,4 +53,10 @@ class DashboardService:
                 total_income += base
             else:
                 total_expense += base
-        return total_income, total_expense, wallets
+        # Totals are summed in the base currency, then rendered once in the
+        # display currency so a mixed-currency household reads one figure.
+        return (
+            converter.base_to_target(total_income),
+            converter.base_to_target(total_expense),
+            wallets,
+        )

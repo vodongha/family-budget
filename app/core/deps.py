@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.currency import BASE_CURRENCY, is_supported
 from app.core.database import get_session
 from app.core.security import decode_access_token
 from app.domains.users.models import User
@@ -68,3 +69,22 @@ def get_optional_family(current_user: CurrentUser) -> int | None:
 
 
 OptionalFamily = Annotated[int | None, Depends(get_optional_family)]
+
+
+def get_display_currency(display_currency: str = BASE_CURRENCY) -> str:
+    """A query param: the ISO-4217 currency to render cross-wallet totals in.
+
+    Per-wallet balances always stay in their own currency; only aggregates
+    (dashboard/stats/budget totals) are converted to this. Defaults to the base
+    currency; an unsupported code is a 422 so the client can't silently mislabel
+    figures."""
+    code = display_currency.upper()
+    if not is_supported(code):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unsupported currency: {display_currency}",
+        )
+    return code
+
+
+DisplayCurrency = Annotated[str, Depends(get_display_currency)]
