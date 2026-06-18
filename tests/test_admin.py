@@ -332,6 +332,29 @@ def test_budget_add_and_delete(client: TestClient, db_session: Session) -> None:
     )
 
 
+def test_category_and_budget_edit_forms(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    fam = _make_family(db_session)
+    _login(client)
+    csrf = _csrf_from(client, f"/admin/families/{fam.rid}")
+    client.post(
+        f"/admin/families/{fam.rid}/categories",
+        data={"name": "Food", "kind": "expense", "csrf": csrf},
+        follow_redirects=False,
+    )
+    page = client.get(f"/admin/families/{fam.rid}").text
+    cat_rid = re.search(r"/admin/categories/([0-9A-Z]+)/edit", page).group(1)
+    assert client.get(f"/admin/categories/{cat_rid}/edit").status_code == 200
+    client.post(
+        f"/admin/families/{fam.rid}/budgets",
+        data={"category_rid": cat_rid, "amount": "100000", "csrf": csrf},
+        follow_redirects=False,
+    )
+    page = client.get(f"/admin/families/{fam.rid}").text
+    bud_rid = re.search(r"/admin/budgets/([0-9A-Z]+)/edit", page).group(1)
+    assert client.get(f"/admin/budgets/{bud_rid}/edit").status_code == 200
+
+
 def test_wallet_rename_and_delete(client: TestClient, db_session: Session) -> None:
     _make_admin(db_session)
     owner = _make_user(db_session)

@@ -112,6 +112,9 @@ class AdminRepository:
     def get_family_by_rid(self, rid: str) -> Family | None:
         return self._session.scalar(select(Family).where(Family.rid == rid))
 
+    def get_family_by_id(self, family_id: int) -> Family | None:
+        return self._session.get(Family, family_id)
+
     def get_wallet_by_rid(self, rid: str) -> Wallet | None:
         return self._session.scalar(select(Wallet).where(Wallet.rid == rid))
 

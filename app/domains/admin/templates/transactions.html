@@ -2,49 +2,25 @@
 {% block title %}Transactions{% endblock %}
 {% block heading %}Transactions{% endblock %}
 {% block content %}
-
-<form class="toolbar" method="get" action="/admin/transactions">
-  <div class="field" style="margin:0;">
-    <label>Type</label>
-    <select name="type" onchange="this.form.submit()">
-      <option value="" {{ 'selected' if not type_ else '' }}>all</option>
-      {% for opt in ['expense','income','transfer_in','transfer_out'] %}
-      <option value="{{ opt }}" {{ 'selected' if type_ == opt else '' }}>{{ opt }}</option>
-      {% endfor %}
-    </select>
-  </div>
-</form>
-
-{% if data.rows %}
-<div class="dt-scroll">
-  <table>
-    <thead>
-      <tr><th>Date</th><th>Wallet</th><th>Type</th><th>Amount</th><th>Category</th><th>By</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for t in data.rows %}
-      <tr>
-        <td>{{ t.occurred_on.isoformat() }}</td>
-        <td><a href="/admin/wallets/{{ t.wallet.rid }}">{{ t.wallet.name }}</a></td>
-        <td>{{ t.type }}</td>
-        <td>{{ t.amount | money(t.wallet.currency) }} {{ t.wallet.currency }}</td>
-        <td>{{ t.category.name if t.category else '—' }}</td>
-        <td>{{ t.creator.display_name if t.creator else '—' }}</td>
-        <td>{% if not t.transfer_group_rid %}<a href="/admin/transactions/{{ t.rid }}/edit">Edit</a>{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-<div class="dt-foot">
-  <span>{{ data.total }} total · page {{ data.page }}/{{ data.pages }}</span>
-  <div class="dt-nav">
-    {% set q = ('&type=' ~ type_) if type_ else '' %}
-    {% if data.page > 1 %}<a class="btn" href="{{ base_url }}?page={{ data.page - 1 }}{{ q }}">‹</a>{% else %}<button class="btn" disabled>‹</button>{% endif %}
-    <span class="dt-page">{{ data.page }} / {{ data.pages }}</span>
-    {% if data.page < data.pages %}<a class="btn" href="{{ base_url }}?page={{ data.page + 1 }}{{ q }}">›</a>{% else %}<button class="btn" disabled>›</button>{% endif %}
-  </div>
-</div>
+{% if txns %}
+<table class="dt" data-per-page="25">
+  <thead>
+    <tr><th>Date</th><th>Wallet</th><th>Type</th><th>Amount</th><th>Category</th><th>By</th><th data-nosort></th></tr>
+  </thead>
+  <tbody>
+    {% for t in txns %}
+    <tr>
+      <td>{{ t.occurred_on.isoformat() }}</td>
+      <td><a href="/admin/wallets/{{ t.wallet.rid }}">{{ t.wallet.name }}</a></td>
+      <td>{{ t.type }}</td>
+      <td>{{ t.amount | money(t.wallet.currency) }} {{ t.wallet.currency }}</td>
+      <td>{{ t.category.name if t.category else '—' }}</td>
+      <td>{{ t.creator.display_name if t.creator else '—' }}</td>
+      <td>{% if not t.transfer_group_rid %}<a href="/admin/transactions/{{ t.rid }}/edit">Edit</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 {% else %}
 <div class="empty">No transactions.</div>
 {% endif %}

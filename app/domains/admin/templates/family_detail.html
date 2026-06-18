@@ -62,37 +62,30 @@
 
 <section>
   <h2>Categories</h2>
-  {# Standalone forms; cell inputs/buttons reference them via the HTML5 form= attribute
-     (a <form> can't legally wrap <td>s). #}
-  {% for c in categories %}
-  <form id="catedit-{{ c.rid }}" method="post" action="/admin/categories/{{ c.rid }}/edit">
-    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="family_rid" value="{{ family.rid }}">
-  </form>
-  <form id="catdel-{{ c.rid }}" method="post" action="/admin/categories/{{ c.rid }}/delete"
-        onsubmit="return confirm('Delete this category? Its transactions become uncategorized.');">
-    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="family_rid" value="{{ family.rid }}">
-  </form>
-  {% endfor %}
-  <div class="dt-scroll">
-    <table>
-      <thead><tr><th>Name</th><th>Kind</th><th>Icon</th><th>Color</th><th></th></tr></thead>
-      <tbody>
-        {% for c in categories %}
-        <tr>
-          <td><input form="catedit-{{ c.rid }}" name="name" value="{{ c.name }}" style="min-width:120px;"></td>
-          <td>{{ c.kind }}</td>
-          <td><input form="catedit-{{ c.rid }}" name="icon" value="{{ c.icon or '' }}" style="width:60px;"></td>
-          <td><input form="catedit-{{ c.rid }}" name="color" value="{{ c.color or '' }}" style="width:80px;"></td>
-          <td style="white-space:nowrap;">
-            <button class="btn" type="submit" form="catedit-{{ c.rid }}" style="padding:3px 9px;">Save</button>
-            <button class="btn btn-danger" type="submit" form="catdel-{{ c.rid }}" style="padding:3px 9px;">Delete</button>
-          </td>
-        </tr>
-        {% endfor %}
-        {% if not categories %}<tr><td colspan="5" class="empty">No categories.</td></tr>{% endif %}
-      </tbody>
-    </table>
-  </div>
+  {% if categories %}
+  <table class="dt" data-per-page="10">
+    <thead><tr><th>Name</th><th>Kind</th><th>Icon</th><th>Color</th><th data-nosort></th></tr></thead>
+    <tbody>
+      {% for c in categories %}
+      <tr>
+        <td>{{ c.name }}</td>
+        <td>{{ c.kind }}</td>
+        <td>{{ c.icon or '—' }}</td>
+        <td>{{ c.color or '—' }}</td>
+        <td style="white-space:nowrap;">
+          <a href="/admin/categories/{{ c.rid }}/edit">Edit</a>
+          <form method="post" action="/admin/categories/{{ c.rid }}/delete" style="display:inline; margin-left:8px;"
+                onsubmit="return confirm('Delete this category? Its transactions become uncategorized.');">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="family_rid" value="{{ family.rid }}">
+            <button class="btn btn-danger" type="submit" style="padding:3px 9px;">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">No categories.</div>{% endif %}
   <form method="post" action="/admin/families/{{ family.rid }}/categories" class="toolbar" style="align-items:flex-end; margin-top:12px;">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="field" style="margin:0;"><label>New category</label><input name="name" placeholder="name" required></div>
@@ -106,33 +99,28 @@
 
 <section>
   <h2>Budgets <span class="who">(monthly limit, in VND)</span></h2>
-  {% for b in budgets %}
-  <form id="budedit-{{ b.rid }}" method="post" action="/admin/budgets/{{ b.rid }}/edit">
-    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="family_rid" value="{{ family.rid }}">
-  </form>
-  <form id="buddel-{{ b.rid }}" method="post" action="/admin/budgets/{{ b.rid }}/delete"
-        onsubmit="return confirm('Delete this budget?');">
-    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="family_rid" value="{{ family.rid }}">
-  </form>
-  {% endfor %}
-  <div class="dt-scroll">
-    <table>
-      <thead><tr><th>Category</th><th>Limit (VND)</th><th></th></tr></thead>
-      <tbody>
-        {% for b in budgets %}
-        <tr>
-          <td>{{ b.category.name if b.category else '—' }}</td>
-          <td><input form="budedit-{{ b.rid }}" name="amount" inputmode="numeric" value="{{ b.amount }}" style="width:140px;"></td>
-          <td style="white-space:nowrap;">
-            <button class="btn" type="submit" form="budedit-{{ b.rid }}" style="padding:3px 9px;">Save</button>
-            <button class="btn btn-danger" type="submit" form="buddel-{{ b.rid }}" style="padding:3px 9px;">Delete</button>
-          </td>
-        </tr>
-        {% endfor %}
-        {% if not budgets %}<tr><td colspan="3" class="empty">No budgets.</td></tr>{% endif %}
-      </tbody>
-    </table>
-  </div>
+  {% if budgets %}
+  <table class="dt" data-per-page="10">
+    <thead><tr><th>Category</th><th>Limit (VND)</th><th data-nosort></th></tr></thead>
+    <tbody>
+      {% for b in budgets %}
+      <tr>
+        <td>{{ b.category.name if b.category else '—' }}</td>
+        <td>{{ b.amount }}</td>
+        <td style="white-space:nowrap;">
+          <a href="/admin/budgets/{{ b.rid }}/edit">Edit</a>
+          <form method="post" action="/admin/budgets/{{ b.rid }}/delete" style="display:inline; margin-left:8px;"
+                onsubmit="return confirm('Delete this budget?');">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="family_rid" value="{{ family.rid }}">
+            <button class="btn btn-danger" type="submit" style="padding:3px 9px;">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty">No budgets.</div>{% endif %}
   <form method="post" action="/admin/families/{{ family.rid }}/budgets" class="toolbar" style="align-items:flex-end; margin-top:12px;">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="field" style="margin:0;"><label>New budget — category</label>
