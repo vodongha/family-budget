@@ -3,7 +3,7 @@
 from logging.config import fileConfig
 
 from alembic import context
-
+from app.core.config import settings
 from app.core.database import Base, get_engine
 
 # Import models so their tables are registered on Base.metadata for autogenerate.
@@ -17,6 +17,15 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+
+# When the app owns a dedicated schema (ORACLE_SCHEMA), the alembic_version
+# bookkeeping table lives there too. We connect as ADMIN and only reach that
+# schema via ALTER SESSION SET CURRENT_SCHEMA, but Alembic's "does the version
+# table exist?" check inspects the *connecting* user's schema by default — so
+# without this it can't see FAMILY_BUDGET.alembic_version, tries to recreate it,
+# and hits ORA-00955. Pinning version_table_schema makes the check (and writes)
+# target the right schema. Empty → default (the connecting user's schema).
+_version_table_schema = settings.oracle_schema or None
 
 
 def include_name(name: str | None, type_: str, parent_names: dict) -> bool:
@@ -39,6 +48,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_name=include_name,
+        version_table_schema=_version_table_schema,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -50,6 +60,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             include_name=include_name,
+            version_table_schema=_version_table_schema,
         )
         with context.begin_transaction():
             context.run_migrations()
