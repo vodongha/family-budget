@@ -15,6 +15,7 @@ from app.domains.families.router import router as families_router
 from app.domains.health.router import router as health_router
 from app.domains.invitations.router import router as invitations_router
 from app.domains.legal.router import router as legal_router
+from app.domains.rates.router import router as rates_router
 from app.domains.stats.router import router as stats_router
 from app.domains.transactions.router import router as transactions_router
 from app.domains.transfers.router import router as transfers_router
@@ -168,6 +169,7 @@ app.include_router(transactions_router)
 app.include_router(transfers_router)
 app.include_router(dashboard_router)
 app.include_router(stats_router)
+app.include_router(rates_router)
 
 
 @app.get(
