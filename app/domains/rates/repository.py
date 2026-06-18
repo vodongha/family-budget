@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.domains.rates.models import ExchangeRate
@@ -16,6 +16,18 @@ class RateRepository:
         """``{currency: rate_to_base}`` for every stored currency."""
         rows = self._session.scalars(select(ExchangeRate)).all()
         return {r.currency: r.rate_to_base for r in rows}
+
+    def latest_updated_at(self) -> datetime | None:
+        """The most recent ``updated_at`` across all rates (when they were last
+        refreshed), or ``None`` if none are stored yet."""
+        return self._session.scalar(select(func.max(ExchangeRate.updated_at)))
+
+    def count(self) -> int:
+        """How many non-base currencies have a stored rate."""
+        return (
+            self._session.scalar(select(func.count()).select_from(ExchangeRate))
+            or 0
+        )
 
     def upsert(self, currency: str, rate_to_base: float) -> None:
         existing = self._session.scalar(
