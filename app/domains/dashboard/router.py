@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.core.deps import CurrentUser, OptionalFamily, SessionDep
+from app.core.deps import CurrentUser, DisplayCurrency, OptionalFamily, SessionDep
 from app.domains.dashboard.schemas import DashboardSummary
 from app.domains.dashboard.service import DashboardService
 from app.domains.wallets.models import WalletScope
@@ -20,17 +20,21 @@ def summary(
     session: SessionDep,
     family_id: OptionalFamily,
     current_user: CurrentUser,
+    display_currency: DisplayCurrency,
     scope: WalletScope = WalletScope.ALL,
 ) -> DashboardSummary:
     """Net balance, total income/expense and per-wallet balances for the chosen
-    `scope` (`all` / `family` / `personal`). Transfers are excluded from totals."""
+    `scope` (`all` / `family` / `personal`). Transfers are excluded from totals.
+    Totals are rendered in `display_currency` (default base); per-wallet balances
+    stay in their own currency."""
     total_income, total_expense, wallets = DashboardService(session).summary(
-        family_id, current_user.id, scope.value
+        family_id, current_user.id, scope.value, display_currency
     )
     return DashboardSummary(
         total_income=total_income,
         total_expense=total_expense,
         net_balance=total_income - total_expense,
+        currency=display_currency,
         wallet_count=len(wallets),
         wallets=[
             WalletRead(

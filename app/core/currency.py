@@ -50,3 +50,19 @@ def convert_minor(
     major = amount_minor / (10 ** decimals(from_code))
     base_major = major * rate_to_base
     return round(base_major * (10 ** decimals(BASE_CURRENCY)))
+
+
+def convert_from_base(base_minor: int, to_code: str, rate_to_base: float) -> int:
+    """Convert ``base_minor`` (minor units of BASE) into ``to_code`` minor units,
+    given ``rate_to_base`` = how many BASE major units equal one major unit of
+    ``to_code``. The inverse of :func:`convert_minor`, used to render cross-wallet
+    totals in a user-chosen display currency.
+
+    Example: 262500 VND with USD rate 25000 → 262500 / 25000 = $10.50 → 1050
+    USD-minor.
+    """
+    if to_code == BASE_CURRENCY:
+        return base_minor
+    base_major = base_minor / (10 ** decimals(BASE_CURRENCY))
+    target_major = base_major / rate_to_base
+    return round(target_major * (10 ** decimals(to_code)))

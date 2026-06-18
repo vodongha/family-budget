@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.currency import BASE_CURRENCY
 from app.domains.rates.service import CurrencyConverter
 from app.domains.stats.repository import StatsRepository
 from app.domains.transactions.models import TransactionType
@@ -68,6 +69,7 @@ class StatsService:
         user_id: int,
         months: int,
         scope: str = WalletScope.ALL.value,
+        display_currency: str = BASE_CURRENCY,
     ) -> list[MonthlyPoint]:
         months = max(1, min(months, MAX_MONTHS))
         today = datetime.now(UTC).date()
@@ -75,7 +77,7 @@ class StatsService:
         start = date(window[0][0], window[0][1], 1)
         wallet_ids = self._wallets.visible_wallet_ids(family_id, user_id, scope)
 
-        converter = CurrencyConverter(self._session)
+        converter = CurrencyConverter(self._session, display_currency)
         income: dict[tuple[int, int], int] = {k: 0 for k in window}
         expense: dict[tuple[int, int], int] = {k: 0 for k in window}
         for occurred_on, type_, amount, currency in self._repo.rows_since(
@@ -107,8 +109,14 @@ class StatsService:
             else:
                 expense[key] += base
 
+        # Accumulated in base currency; rendered once per month in the display
+        # currency.
         return [
-            MonthlyPoint(f"{y:04d}-{m:02d}", income[(y, m)], expense[(y, m)])
+            MonthlyPoint(
+                f"{y:04d}-{m:02d}",
+                converter.base_to_target(income[(y, m)]),
+                converter.base_to_target(expense[(y, m)]),
+            )
             for (y, m) in window
         ]
 
@@ -119,11 +127,13 @@ class StatsService:
         kind: str,
         months: int,
         scope: str = WalletScope.ALL.value,
+        display_currency: str = BASE_CURRENCY,
     ) -> list[CategorySlice]:
         """Totals grouped by category for one kind (expense/income), over the
         last ``months`` months, restricted to the wallets the caller may see.
         Uncategorized transactions fold into a single bucket with ``category_rid``
-        ``None``. Sorted by amount, descending."""
+        ``None``. Sorted by amount, descending. Amounts are rendered in
+        ``display_currency``."""
         months = max(1, min(months, MAX_MONTHS))
         today = datetime.now(UTC).date()
         window = _month_window(today, months)
@@ -132,7 +142,7 @@ class StatsService:
 
         # Keyed by category_rid (None for uncategorized). Value carries the
         # running total (in base currency) plus the category's display metadata.
-        converter = CurrencyConverter(self._session)
+        converter = CurrencyConverter(self._session, display_currency)
         buckets: dict[str | None, CategorySlice] = {}
         for row in self._repo.category_rows_since(start, wallet_ids):
             if row.type != kind:
@@ -180,4 +190,9 @@ class StatsService:
                 buckets[None] = slice_
             slice_.amount += converter.to_base(amount, currency)
 
-        return sorted(buckets.values(), key=lambda s: s.amount, reverse=True)
+        ordered = sorted(buckets.values(), key=lambda s: s.amount, reverse=True)
+        # Convert each bucket's base total into the display currency (order is
+        # unchanged — conversion is monotonic).
+        for slice_ in ordered:
+            slice_.amount = converter.base_to_target(slice_.amount)
+        return ordered

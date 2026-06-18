@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.core.deps import CurrentUser, OptionalFamily, SessionDep
+from app.core.deps import CurrentUser, DisplayCurrency, OptionalFamily, SessionDep
 from app.domains.categories.models import CategoryKind
 from app.domains.stats.schemas import CategorySlice, MonthlyPoint
 from app.domains.stats.service import StatsService
@@ -20,13 +20,14 @@ def monthly(
     session: SessionDep,
     family_id: OptionalFamily,
     current_user: CurrentUser,
+    display_currency: DisplayCurrency,
     months: int = 6,
     scope: WalletScope = WalletScope.ALL,
 ) -> list[MonthlyPoint]:
     """Income and expense totals per month for the last `months` months, scoped by
-    `scope`. Transfers are excluded."""
+    `scope`. Transfers are excluded. Amounts are in `display_currency`."""
     points = StatsService(session).monthly(
-        family_id, current_user.id, months, scope.value
+        family_id, current_user.id, months, scope.value, display_currency
     )
     return [
         MonthlyPoint(month=p.month, income=p.income, expense=p.expense)
@@ -43,14 +44,16 @@ def by_category(
     session: SessionDep,
     family_id: OptionalFamily,
     current_user: CurrentUser,
+    display_currency: DisplayCurrency,
     kind: CategoryKind = CategoryKind.EXPENSE,
     months: int = 6,
     scope: WalletScope = WalletScope.ALL,
 ) -> list[CategorySlice]:
     """Totals per category for one `kind` (`expense`/`income`) over `months`,
-    sorted by amount descending. Uncategorized entries fold into one bucket."""
+    sorted by amount descending. Uncategorized entries fold into one bucket.
+    Amounts are in `display_currency`."""
     slices = StatsService(session).by_category(
-        family_id, current_user.id, kind.value, months, scope.value
+        family_id, current_user.id, kind.value, months, scope.value, display_currency
     )
     return [
         CategorySlice(

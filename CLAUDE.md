@@ -72,6 +72,13 @@ This app moves real household money. These rules are not style preferences.
   `CurrencyConverter` (`app/domains/rates/`), which reads the `exchange_rates` table (refreshed by a
   Celery-beat job from open.er-api.com, seeded by migration). **Never sum raw minor units across
   currencies.** Transfers require both wallets to share a currency (cross-currency is rejected).
+  **Display currency.** Cross-wallet totals (dashboard/stats/budget) accept an optional
+  `display_currency` query param (the `DisplayCurrency` dep in `app/core/deps.py`, 422 on an
+  unsupported code) and are converted base→that currency via `CurrencyConverter.base_to_target`
+  (`convert_from_base` in `app/core/currency.py`). Per-wallet balances always stay in their own
+  currency. Budgets store the limit in the **base** currency; the `amount` in/out of the budget
+  endpoints is in the request's display currency (converted on save/read), so it follows the
+  client's chosen currency without a schema change.
 
 ## Identifiers
 
