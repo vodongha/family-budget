@@ -376,6 +376,46 @@ def test_wallet_rename_and_delete(client: TestClient, db_session: Session) -> No
     assert client.get(f"/admin/wallets/{wallet.rid}", follow_redirects=False).status_code == 303
 
 
+def test_dependencies_requires_login(client: TestClient) -> None:
+    res = client.get("/admin/dependencies", follow_redirects=False)
+    assert res.status_code == 303
+
+
+def test_dependencies_not_configured(
+    client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "github_token", "")
+    _make_admin(db_session)
+    _login(client)
+    res = client.get("/admin/dependencies")
+    assert res.status_code == 200
+    assert "Not configured" in res.text  # no network call on this path
+
+
+def test_dependency_alert_parser() -> None:
+    from app.domains.admin.deps_panel import _parse_alert
+
+    alert = {
+        "state": "open",
+        "html_url": "https://github.com/x/y/security/dependabot/1",
+        "created_at": "2026-06-18T10:00:00Z",
+        "security_advisory": {"severity": "HIGH", "summary": "Bad bug"},
+        "security_vulnerability": {
+            "package": {"name": "requests", "ecosystem": "pip"},
+            "vulnerable_version_range": "< 2.32.0",
+            "first_patched_version": {"identifier": "2.32.0"},
+        },
+    }
+    parsed = _parse_alert(alert)
+    assert parsed["package"] == "requests"
+    assert parsed["ecosystem"] == "pip"
+    assert parsed["severity"] == "high"
+    assert parsed["patched"] == "2.32.0"
+    assert parsed["created_at"] == "2026-06-18"
+
+
 def test_logout_clears_session(client: TestClient, db_session: Session) -> None:
     _make_admin(db_session)
     csrf = _csrf(client)

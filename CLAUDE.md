@@ -323,8 +323,13 @@ Dockerfile's `COPY app ./app`).
   / reset-password / unlink-Google); per-**wallet** transaction list with **transaction CRUD** +
   wallet rename / delete; a global **/admin/transactions**; **Families** (detail → rename /
   soft-delete / restore, member + wallet views, and **Categories** and **Budgets** CRUD with
-  per-row Edit pages); **Audit** log. Planned: an Ops **Dependencies** panel reading GitHub
-  Dependabot alerts for both repos (app + backend).
+  per-row Edit pages); **Audit** log; and an Ops **Dependencies** panel.
+- **Dependencies panel** (`/admin/dependencies`, `deps_panel.py`) reads **GitHub Dependabot alerts**
+  for the configured repos (`GITHUB_REPOS`, default the backend + app) via a `GITHUB_TOKEN` secret —
+  GitHub is the source of truth, we don't re-implement version diffing or a CVE DB. Results are
+  cached per repo (1h; `?refresh=1` bypasses) and shown as datatables (package / ecosystem /
+  severity / vulnerable range / patched version). No token → a setup hint. A `.github/dependabot.yml`
+  also opens weekly version-update PRs for pip + actions.
 
 ### Privacy policy (`app/domains/legal/`)
 
@@ -521,8 +526,8 @@ Production runs on **Fly.io**, region `sin` (Singapore — closest to ADB), doma
   `REDIS_URL`. The API itself never touches Redis — only the worker does.
 - **Secrets** (set with `fly secrets set`, never committed): `ORACLE_PASSWORD`, `WALLET_PASSWORD`,
   `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `REDIS_URL`, `ADMIN_SESSION_SECRET` (signs the `/admin` session
-  cookie), and the three `WALLET_*_B64`. See the README "Deploy (Fly.io)" section for the exact
-  one-time commands.
+  cookie), `GITHUB_TOKEN` (optional — powers the admin Dependencies panel), and the three
+  `WALLET_*_B64`. See the README "Deploy (Fly.io)" section for the exact one-time commands.
 
 ## Gotchas (learned the hard way — read before debugging these)
 

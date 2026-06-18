@@ -16,6 +16,7 @@ from starlette.status import HTTP_303_SEE_OTHER
 
 from app.core.config import settings
 from app.core.deps import SessionDep
+from app.domains.admin.deps_panel import dependency_report
 from app.domains.admin.money import to_major, to_minor
 from app.domains.admin.security import (
     LOGIN_PATH,
@@ -969,6 +970,27 @@ def budget_delete(
         svc.log(admin, "budget.delete", target_type="budget", target_rid=rid)
         flash(request, "Budget deleted.", "warn")
     return RedirectResponse(back, status_code=_REDIRECT)
+
+
+# --- Ops: dependencies (Dependabot) ----------------------------------------
+
+
+@router.get("/dependencies", response_class=HTMLResponse)
+def dependencies_page(
+    request: Request, session: SessionDep, admin: CurrentAdmin
+) -> HTMLResponse:
+    force = request.query_params.get("refresh") == "1"
+    return templates.TemplateResponse(
+        request,
+        "deps.html",
+        _ctx(
+            request,
+            admin,
+            "deps",
+            crumbs=[{"label": "Dependencies"}],
+            report=dependency_report(force=force),
+        ),
+    )
 
 
 def setup_admin(app: FastAPI) -> None:
