@@ -69,7 +69,7 @@ income/expense together, scoped per family.
   management** (edit / soft-delete / restore / reset password / unlink Google) and **transaction
   CRUD** per wallet + a global transactions view, **family management**
   (rename / soft-delete / restore, members + wallets, and category & budget CRUD), and wallet
-  rename/delete now; an Ops dependency panel planned. Admin transaction writes reuse the app's
+  rename/delete, and an Ops **Dependencies** panel (GitHub Dependabot alerts for both repos). Admin transaction writes reuse the app's
   money logic (integer minor units, derived balances); transfers are delete-only. Admins are
   bootstrapped with `python -m app.scripts.create_admin` — never via the public API
 - **Health** — `GET /health` runs `SELECT 1 FROM dual` to verify the ADB connection
@@ -240,6 +240,9 @@ fly secrets set \
   ADMIN_SESSION_SECRET="$(openssl rand -hex 32)" \
   GOOGLE_CLIENT_ID="...apps.googleusercontent.com" \
   REDIS_URL="rediss://...upstash..." --app famo
+
+# Optional — powers the admin Dependencies panel (GitHub Dependabot alerts):
+fly secrets set GITHUB_TOKEN="ghp_..." --app famo
 
 # Wallet files as base64 secrets (values stay local, never printed):
 fly secrets set \

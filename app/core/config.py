@@ -42,6 +42,17 @@ class Settings(BaseSettings):
     # Idle lifetime of the admin session cookie, in seconds (default 8 hours).
     admin_session_max_age: int = 60 * 60 * 8
 
+    # Admin "Dependencies" panel — reads GitHub Dependabot alerts for these repos
+    # (outdated / vulnerable libraries). Needs a token with read access to the
+    # repos' Dependabot alerts (classic `repo`/`security_events`, or a fine-grained
+    # token with "Dependabot alerts: read"). Empty → the panel shows a setup hint.
+    github_token: str = ""
+    github_repos: str = "vodongha/family-budget,vodongha/family-budget-app"
+
+    @property
+    def github_repo_list(self) -> list[str]:
+        return [r.strip() for r in self.github_repos.split(",") if r.strip()]
+
     # Infra
     redis_url: str = "redis://redis:6379/0"
     env: str = "development"

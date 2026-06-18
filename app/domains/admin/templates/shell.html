@@ -10,6 +10,7 @@
 {% set ic_family = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7.5 8 2.5l6 5"/><path d="M3.2 6.8V14h9.6V6.8"/><rect x="6.4" y="9.4" width="3.2" height="4.6"/></svg>' %}
 {% set ic_audit = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="1.8" width="11" height="12.4" rx="1.2"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>' %}
 {% set ic_txn = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 5.5h9l-2-2M13.5 10.5h-9l2 2"/></svg>' %}
+{% set ic_deps = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1.8 14 5v6L8 14.2 2 11V5z"/><path d="M2 5l6 3 6-3M8 8v6.2"/></svg>' %}
 {% set ic_logout = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2.5H3.2A1.2 1.2 0 0 0 2 3.7v8.6a1.2 1.2 0 0 0 1.2 1.2H6"/><path d="M9.5 11 13 8 9.5 5M13 8H6"/></svg>' %}
 {% set ic_menu = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>' %}
 {% set ic_collapse = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3.5 5.5 8 10 12.5"/><path d="M13.5 3.5 9 8l4.5 4.5"/></svg>' %}
@@ -40,6 +41,7 @@
         <button class="grp-label" type="button" onclick="toggleGroup(this)">System</button>
         <div class="grp-items">
           {{ navlink('/admin/audit', 'audit', 'Audit log', ic_audit) }}
+          {{ navlink('/admin/dependencies', 'deps', 'Dependencies', ic_deps) }}
         </div>
       </div>
     </nav>

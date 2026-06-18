@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Python deps (pyproject.toml) — weekly PRs grouped to keep the noise down.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      python-deps:
+        patterns: ["*"]
+  # Keep the GitHub Actions used by CI/CD up to date too.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

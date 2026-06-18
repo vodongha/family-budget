@@ -1,0 +1,62 @@
+{% extends "shell.html" %}
+{% block title %}Dependencies{% endblock %}
+{% block heading %}Dependencies{% endblock %}
+{% block content %}
+
+{% macro sev_pill(s) %}
+  {% if s in ('critical', 'high') %}<span class="pill flash-error" style="border:none;">{{ s }}</span>
+  {% elif s == 'medium' %}<span class="pill pill-warn">{{ s }}</span>
+  {% else %}<span class="pill" style="background:var(--surface-2); color:var(--muted);">{{ s or '—' }}</span>{% endif %}
+{% endmacro %}
+
+{% if not report.configured %}
+<div class="flash flash-warn" style="margin-bottom:18px;">
+  <strong>Not configured.</strong> Set a GitHub token to read Dependabot alerts.
+</div>
+<div class="kv" style="max-width:680px;">
+  <div class="k">Setup</div>
+  <div class="v" style="font-weight:400; line-height:1.7;">
+    1. Enable <em>Dependabot alerts</em> on each repo (GitHub → Settings → Code security).<br>
+    2. Create a token with read access to Dependabot alerts (classic <code>repo</code>/<code>security_events</code>,
+       or a fine-grained token with <code>Dependabot alerts: read</code>).<br>
+    3. <code>fly secrets set GITHUB_TOKEN=... -a famo</code> &nbsp;(repos: <code>{{ report.repos | map(attribute='repo') | join(', ') }}</code>,
+       configurable via <code>GITHUB_REPOS</code>).
+  </div>
+</div>
+{% else %}
+<div class="toolbar">
+  <a class="btn" href="/admin/dependencies?refresh=1">↻ Refresh</a>
+  <span class="who">Cached up to 1 hour · GitHub Dependabot</span>
+</div>
+
+{% for r in report.repos %}
+<section>
+  <h2>{{ r.repo }}</h2>
+  {% if not r.ok %}
+    <div class="flash flash-error">Couldn't read alerts: {{ r.error }}</div>
+  {% elif not r.alerts %}
+    <div class="flash flash-ok">No open Dependabot alerts. 🎉</div>
+  {% else %}
+  <table class="dt" data-per-page="25">
+    <thead>
+      <tr><th>Package</th><th>Ecosystem</th><th>Severity</th><th>Vulnerable</th><th>Patched</th><th>Opened</th><th data-nosort></th></tr>
+    </thead>
+    <tbody>
+      {% for a in r.alerts %}
+      <tr>
+        <td>{{ a.package }}</td>
+        <td>{{ a.ecosystem }}</td>
+        <td>{{ sev_pill(a.severity) }}</td>
+        <td>{{ a.vulnerable_range or '—' }}</td>
+        <td>{{ a.patched or '—' }}</td>
+        <td>{{ a.created_at }}</td>
+        <td>{% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener">View</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endfor %}
+{% endif %}
+{% endblock %}
