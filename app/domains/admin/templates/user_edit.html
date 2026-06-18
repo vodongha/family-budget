@@ -1,0 +1,36 @@
+{% extends "shell.html" %}
+{% block title %}Edit {{ user.email }}{% endblock %}
+{% block heading %}Edit user{% endblock %}
+{% block content %}
+<form class="form" method="post" action="/admin/users/{{ user.rid }}/edit">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="field">
+    <label>Display name</label>
+    <input name="display_name" value="{{ user.display_name }}" required>
+  </div>
+  <div class="field">
+    <label>Email</label>
+    <input name="email" type="email" value="{{ user.email }}" required>
+  </div>
+  <div class="field">
+    <label>Phone</label>
+    <input name="phone" value="{{ user.phone or '' }}" placeholder="+84…">
+    <div class="hint">Blank clears it. Stored in E.164.</div>
+  </div>
+  <div class="field">
+    <label>Role</label>
+    <select name="role">
+      {% for r in roles %}<option value="{{ r }}" {{ 'selected' if user.role == r else '' }}>{{ r }}</option>{% endfor %}
+    </select>
+    <div class="hint">Family role (owner / member) — separate from super-admin.</div>
+  </div>
+  <div class="field check">
+    <input type="checkbox" name="is_superadmin" id="sa" value="true" {{ 'checked' if user.is_superadmin else '' }}>
+    <label for="sa" style="margin:0;">Platform super-admin (can access /admin)</label>
+  </div>
+  <div class="actions">
+    <button class="btn-primary" type="submit">Save</button>
+    <a class="btn" href="/admin/users/{{ user.rid }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

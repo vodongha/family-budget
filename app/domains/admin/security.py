@@ -39,6 +39,24 @@ def logout_admin(request: Request) -> None:
     request.session.clear()
 
 
+_SESSION_FLASH_KEY = "admin_flash"
+
+
+def flash(request: Request, message: str, kind: str = "ok") -> None:
+    """Queue a one-shot message (``kind`` = ok|warn|error) shown after the next
+    redirect, then cleared."""
+    msgs = request.session.get(_SESSION_FLASH_KEY, [])
+    msgs.append({"message": message, "kind": kind})
+    request.session[_SESSION_FLASH_KEY] = msgs
+
+
+def pop_flashes(request: Request) -> list[dict[str, str]]:
+    msgs = request.session.get(_SESSION_FLASH_KEY, [])
+    if msgs:
+        request.session[_SESSION_FLASH_KEY] = []
+    return msgs
+
+
 def csrf_token(request: Request) -> str:
     """The session's CSRF token, creating one if absent (e.g. on the login page
     before authenticating)."""

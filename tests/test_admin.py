@@ -7,6 +7,41 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
 from app.domains.users.models import User, UserRole, new_rid
+from app.domains.wallets.models import Wallet, WalletVisibility
+
+
+def _csrf_from(client: TestClient, path: str) -> str:
+    html = client.get(path).text
+    m = re.search(r'name="csrf" value="([^"]+)"', html)
+    assert m, f"no CSRF token on {path}"
+    return m.group(1)
+
+
+def _make_user(db: Session, email: str = "user@example.com") -> User:
+    u = User(
+        rid=new_rid(),
+        email=email,
+        hashed_password=hash_password("user-pass-123"),
+        display_name="User",
+        family_id=None,
+        role=UserRole.MEMBER.value,
+    )
+    db.add(u)
+    db.commit()
+    return u
+
+
+def _make_wallet(db: Session, owner: User) -> Wallet:
+    w = Wallet(
+        rid=new_rid(),
+        name="Cash",
+        visibility=WalletVisibility.PERSONAL.value,
+        owner_user_id=owner.id,
+        currency="VND",
+    )
+    db.add(w)
+    db.commit()
+    return w
 
 
 def _make_admin(
@@ -143,6 +178,88 @@ def test_users_page_lists_the_admin(client: TestClient, db_session: Session) -> 
     _login(client)
     res = client.get("/admin/users")
     assert "boss@example.com" in res.text
+
+
+def test_user_detail_and_edit(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    target = _make_user(db_session)
+    _login(client)
+    detail = client.get(f"/admin/users/{target.rid}")
+    assert detail.status_code == 200
+    assert "user@example.com" in detail.text
+
+    csrf = _csrf_from(client, f"/admin/users/{target.rid}/edit")
+    res = client.post(
+        f"/admin/users/{target.rid}/edit",
+        data={
+            "display_name": "Renamed",
+            "email": "user@example.com",
+            "phone": "",
+            "role": "member",
+            "csrf": csrf,
+        },
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    db_session.refresh(target)
+    assert target.display_name == "Renamed"
+
+
+def test_user_soft_delete_and_restore(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    target = _make_user(db_session)
+    _login(client)
+    csrf = _csrf_from(client, f"/admin/users/{target.rid}")
+    client.post(
+        f"/admin/users/{target.rid}/delete", data={"csrf": csrf}, follow_redirects=False
+    )
+    db_session.refresh(target)
+    assert target.is_deleted is True
+    client.post(
+        f"/admin/users/{target.rid}/restore", data={"csrf": csrf}, follow_redirects=False
+    )
+    db_session.refresh(target)
+    assert target.is_deleted is False
+
+
+def test_transaction_crud(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    owner = _make_user(db_session)
+    wallet = _make_wallet(db_session, owner)
+    _login(client)
+
+    # create
+    csrf = _csrf_from(client, f"/admin/wallets/{wallet.rid}/transactions/new")
+    client.post(
+        f"/admin/wallets/{wallet.rid}/transactions/new",
+        data={"type": "income", "amount": "50000", "occurred_on": "2026-06-18", "csrf": csrf},
+        follow_redirects=False,
+    )
+    detail = client.get(f"/admin/wallets/{wallet.rid}")
+    assert "50000" in detail.text
+    rid = re.search(r"/admin/transactions/([0-9A-Z]+)/edit", detail.text).group(1)
+
+    # edit
+    csrf = _csrf_from(client, f"/admin/transactions/{rid}/edit")
+    client.post(
+        f"/admin/transactions/{rid}/edit",
+        data={"type": "expense", "amount": "12000", "occurred_on": "2026-06-18", "csrf": csrf},
+        follow_redirects=False,
+    )
+    assert "12000" in client.get(f"/admin/wallets/{wallet.rid}").text
+
+    # delete
+    csrf = _csrf_from(client, f"/admin/wallets/{wallet.rid}")
+    client.post(
+        f"/admin/transactions/{rid}/delete", data={"csrf": csrf}, follow_redirects=False
+    )
+    assert "No transactions in this wallet" in client.get(f"/admin/wallets/{wallet.rid}").text
+
+
+def test_transactions_page_renders(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    _login(client)
+    assert client.get("/admin/transactions").status_code == 200
 
 
 def test_logout_clears_session(client: TestClient, db_session: Session) -> None:

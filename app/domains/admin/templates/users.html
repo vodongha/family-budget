@@ -13,7 +13,7 @@
   <tbody>
     {% for u in users %}
     <tr>
-      <td>{{ u.email }}</td>
+      <td><a href="/admin/users/{{ u.rid }}">{{ u.email }}</a></td>
       <td>{{ u.display_name }}</td>
       <td>{{ u.role }}</td>
       <td>{% if u.is_superadmin %}<span class="pill pill-warn">admin</span>{% else %}—{% endif %}</td>

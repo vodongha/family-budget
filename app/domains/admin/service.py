@@ -4,21 +4,28 @@ Reachable only behind ``require_admin``; these methods assume the caller is an
 authenticated super-admin.
 """
 
-from datetime import datetime
+from datetime import date, datetime
+from math import ceil
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.security import verify_password
+from app.core.security import hash_password, verify_password
 from app.domains.admin.models import AdminAuditLog
 from app.domains.admin.repository import AdminRepository
+from app.domains.transactions.models import Transaction, TransactionType
+from app.domains.transactions.repository import TransactionRepository
 from app.domains.users.models import User
+from app.domains.wallets.models import Wallet
+from app.domains.wallets.repository import WalletRepository
 
 
 class AdminService:
     def __init__(self, session: Session) -> None:
         self._session = session
         self._repo = AdminRepository(session)
+        self._wallets = WalletRepository(session)
+        self._txns = TransactionRepository(session)
 
     def authenticate(self, email: str, password: str) -> User | None:
         """Verify admin credentials. Returns the user only if they are an active
@@ -90,6 +97,136 @@ class AdminService:
             detail=detail,
         )
         self._session.commit()
+
+    # --- users ---------------------------------------------------------------
+
+    def get_user(self, rid: str) -> User | None:
+        return self._repo.get_user_by_rid(rid)
+
+    def user_wallets(self, user: User) -> list[dict[str, object]]:
+        wallets = self._repo.wallets_visible_to(user)
+        balances = self._wallets.balances_by_wallet([w.id for w in wallets])
+        return [{"wallet": w, "balance": balances.get(w.id, 0)} for w in wallets]
+
+    def update_user(
+        self,
+        user: User,
+        *,
+        display_name: str,
+        email: str,
+        phone: str | None,
+        role: str,
+        is_superadmin: bool,
+    ) -> None:
+        user.display_name = display_name.strip()
+        user.email = email.strip().lower()
+        user.phone = (phone or "").strip() or None
+        user.role = role
+        user.is_superadmin = is_superadmin
+        self._session.commit()
+
+    def set_user_deleted(self, user: User, deleted: bool) -> None:
+        user.is_deleted = deleted
+        user.deleted_at = self.now() if deleted else None
+        if deleted:
+            user.google_sub = None  # unlink, mirroring self-service deletion
+        self._session.commit()
+
+    def reset_password(self, user: User, new_password: str) -> None:
+        user.hashed_password = hash_password(new_password)
+        self._session.commit()
+
+    def unlink_google(self, user: User) -> None:
+        user.google_sub = None
+        self._session.commit()
+
+    # --- wallets / transactions ---------------------------------------------
+
+    def get_wallet(self, rid: str) -> Wallet | None:
+        return self._repo.get_wallet_by_rid(rid)
+
+    def wallet_balance(self, wallet: Wallet) -> int:
+        return self._wallets.balance(wallet.id)
+
+    def categories_for_wallet(self, wallet: Wallet):  # type: ignore[no-untyped-def]
+        return self._repo.categories_for_wallet(wallet)
+
+    def get_transaction(self, rid: str) -> Transaction | None:
+        return self._repo.get_transaction_by_rid(rid)
+
+    def get_category(self, rid: str):  # type: ignore[no-untyped-def]
+        return self._repo.get_category_by_rid(rid)
+
+    def transactions(
+        self, *, page: int = 1, per_page: int = 25, **filters: object
+    ) -> dict[str, object]:
+        rows, total = self._repo.transactions_page(
+            page=page, per_page=per_page, **filters  # type: ignore[arg-type]
+        )
+        return {
+            "rows": rows,
+            "total": total,
+            "page": page,
+            "pages": max(1, ceil(total / per_page)),
+            "per_page": per_page,
+        }
+
+    def create_transaction(
+        self,
+        actor: User,
+        wallet: Wallet,
+        *,
+        type_: TransactionType,
+        amount_minor: int,
+        note: str | None,
+        occurred_on: date,
+        category_id: int | None,
+    ) -> Transaction:
+        creator = self._repo.default_actor_for_wallet(wallet) or actor.id
+        txn = self._txns.add(
+            family_id=wallet.family_id,
+            wallet_id=wallet.id,
+            created_by_user_id=creator,
+            type_=type_,
+            amount=amount_minor,
+            note=note,
+            occurred_on=occurred_on,
+            category_id=category_id,
+        )
+        self._session.commit()
+        return txn
+
+    def update_transaction(
+        self,
+        txn: Transaction,
+        wallet: Wallet,
+        *,
+        type_: TransactionType,
+        amount_minor: int,
+        note: str | None,
+        occurred_on: date,
+        category_id: int | None,
+    ) -> None:
+        txn.wallet_id = wallet.id
+        txn.family_id = wallet.family_id
+        txn.type = type_.value
+        txn.amount = amount_minor
+        txn.note = note
+        txn.occurred_on = occurred_on
+        txn.category_id = category_id
+        self._session.commit()
+
+    def delete_transaction(self, txn: Transaction) -> int:
+        """Delete a transaction; a transfer leg takes its paired leg with it.
+        Returns the number of rows removed."""
+        if txn.transfer_group_rid:
+            legs = self._txns.list_by_transfer_group(txn.transfer_group_rid)
+        else:
+            legs = [txn]
+        for leg in legs:
+            self._txns.delete(leg)
+        self._session.commit()
+        return len(legs)
 
     @staticmethod
     def now() -> datetime:

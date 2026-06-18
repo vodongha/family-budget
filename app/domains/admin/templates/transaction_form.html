@@ -1,0 +1,54 @@
+{% extends "shell.html" %}
+{% block title %}{{ 'Edit' if txn else 'New' }} transaction{% endblock %}
+{% block heading %}{{ 'Edit' if txn else 'New' }} transaction{% endblock %}
+{% block content %}
+<form class="form" method="post"
+      action="{{ ('/admin/transactions/' ~ txn.rid ~ '/edit') if txn else ('/admin/wallets/' ~ wallet.rid ~ '/transactions/new') }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <div class="kv" style="margin-bottom:16px;">
+    <div class="k">Wallet</div>
+    <div class="v">{{ wallet.name }} · {{ wallet.currency }}</div>
+  </div>
+
+  <div class="form-row">
+    <div class="field">
+      <label>Type</label>
+      <select name="type">
+        <option value="expense" {{ 'selected' if txn and txn.type == 'expense' else '' }}>expense</option>
+        <option value="income" {{ 'selected' if txn and txn.type == 'income' else '' }}>income</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Amount ({{ wallet.currency }})</label>
+      <input name="amount" inputmode="decimal" value="{{ amount_value }}" placeholder="0" required>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="field">
+      <label>Date</label>
+      <input name="occurred_on" type="date" value="{{ txn.occurred_on.isoformat() if txn else today }}">
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <select name="category_rid">
+        <option value="">— none —</option>
+        {% for c in categories %}
+        <option value="{{ c.rid }}" {{ 'selected' if txn and txn.category and txn.category.rid == c.rid else '' }}>{{ c.name }} ({{ c.kind }})</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Note</label>
+    <input name="note" value="{{ txn.note or '' if txn else '' }}" maxlength="500">
+  </div>
+
+  <div class="actions">
+    <button class="btn-primary" type="submit">{{ 'Save' if txn else 'Create' }}</button>
+    <a class="btn" href="/admin/wallets/{{ wallet.rid }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}
