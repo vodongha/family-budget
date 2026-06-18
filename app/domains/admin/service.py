@@ -56,6 +56,22 @@ class AdminService:
     def recent_audit(self, limit: int = 50) -> list[AdminAuditLog]:
         return self._repo.recent_audit(limit=limit)
 
+    def list_users(self) -> list[User]:
+        return self._repo.list_users()
+
+    def list_families(self) -> list[dict[str, object]]:
+        """Families with their derived member + wallet counts, for the list page."""
+        members = self._repo.family_member_counts()
+        wallets = self._repo.family_wallet_counts()
+        return [
+            {
+                "family": f,
+                "members": members.get(f.id, 0),
+                "wallets": wallets.get(f.id, 0),
+            }
+            for f in self._repo.list_families()
+        ]
+
     def log(
         self,
         actor: User,

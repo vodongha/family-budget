@@ -108,6 +108,43 @@ def test_dashboard_shows_user_count(client: TestClient, db_session: Session) -> 
     assert "Admins" in dash.text
 
 
+def _login(client: TestClient) -> None:
+    csrf = _csrf(client)
+    client.post(
+        "/admin/login",
+        data={"email": "boss@example.com", "password": "admin-pass-123", "csrf": csrf},
+    )
+
+
+def test_list_pages_require_login(client: TestClient) -> None:
+    for path in ("/admin/users", "/admin/families", "/admin/audit"):
+        res = client.get(path, follow_redirects=False)
+        assert res.status_code == 303
+        assert res.headers["location"] == "/admin/login"
+
+
+def test_list_pages_render_for_admin(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    _login(client)
+    for path, marker in (
+        ("/admin/users", "Users"),
+        ("/admin/families", "Families"),
+        ("/admin/audit", "Audit log"),
+    ):
+        res = client.get(path)
+        assert res.status_code == 200
+        assert marker in res.text
+        # The datatable enhancer hook is present on list tables.
+        assert 'class="dt"' in res.text or "No " in res.text
+
+
+def test_users_page_lists_the_admin(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    _login(client)
+    res = client.get("/admin/users")
+    assert "boss@example.com" in res.text
+
+
 def test_logout_clears_session(client: TestClient, db_session: Session) -> None:
     _make_admin(db_session)
     csrf = _csrf(client)

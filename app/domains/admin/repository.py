@@ -8,7 +8,7 @@ boundary; they must only ever be reached behind ``require_admin``.
 from datetime import datetime
 
 from sqlalchemy import false, func, select, true
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.domains.admin.models import AdminAuditLog
 from app.domains.transactions.models import Transaction
@@ -66,6 +66,39 @@ class AdminRepository:
                 select(func.count()).select_from(Transaction)
             ),
         }
+
+    # --- listings (read-only; client-side datatable handles sort/search/page) -
+
+    def list_users(self, limit: int = 1000) -> list[User]:
+        return list(
+            self._session.scalars(
+                select(User)
+                .options(joinedload(User.family))
+                .order_by(User.created_at.desc())
+                .limit(limit)
+            ).all()
+        )
+
+    def list_families(self, limit: int = 1000) -> list[Family]:
+        return list(
+            self._session.scalars(
+                select(Family).order_by(Family.created_at.desc()).limit(limit)
+            ).all()
+        )
+
+    def _counts_by_family(self, column) -> dict[int, int]:  # type: ignore[no-untyped-def]
+        rows = self._session.execute(
+            select(column, func.count())
+            .where(column.is_not(None))
+            .group_by(column)
+        ).all()
+        return {fid: count for fid, count in rows}
+
+    def family_member_counts(self) -> dict[int, int]:
+        return self._counts_by_family(User.family_id)
+
+    def family_wallet_counts(self) -> dict[int, int]:
+        return self._counts_by_family(Wallet.family_id)
 
     # --- audit log -----------------------------------------------------------
 

@@ -299,10 +299,16 @@ Dockerfile's `COPY app ./app`).
   must stay behind `require_admin`.
 - **Audit log** — `admin_audit_log` (model in `admin/models.py`) records every admin mutation
   (actor, action, target, JSON detail). Call `AdminService.log(...)` after a successful mutation.
-- **Scope so far (Step 1):** login/logout + dashboard (platform metrics + recent audit). Planned:
-  user/family management (edit / soft-delete / restore / purge), an audit viewer, and an Ops
-  **Dependencies** panel that reads GitHub Dependabot alerts for both repos (app + backend) to flag
-  outdated / vulnerable libraries.
+- **UI conventions (baked into `base.html` / `shell.html`, apply to every page):** responsive —
+  the sidebar is **collapsible** (toggle persisted in `localStorage`) and becomes an **off-canvas
+  drawer on mobile** (≤860px); the nav is **grouped with inline-SVG icons** (Overview / Manage /
+  System). Tables use a **self-contained datatable enhancer** (no CDN) — add `class="dt"` (and
+  optional `data-per-page`) and it gains per-column **sort**, a **search** box, and **pagination**;
+  mark a non-sortable header with `data-nosort`.
+- **Scope so far:** login/logout, dashboard (platform metrics + recent activity), and read-only
+  **Users / Families / Audit** list pages (datatables). Planned: write actions (edit / soft-delete /
+  restore / purge, all audit-logged) and an Ops **Dependencies** panel reading GitHub Dependabot
+  alerts for both repos (app + backend) to flag outdated / vulnerable libraries.
 
 ### Privacy policy (`app/domains/legal/`)
 
