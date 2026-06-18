@@ -78,9 +78,10 @@ This app moves real household money. These rules are not style preferences.
   (`convert_from_base` in `app/core/currency.py`). Per-wallet balances always stay in their own
   currency. Budgets store the limit in the **base** currency; the `amount` in/out of the budget
   endpoints is in the request's display currency (converted on save/read), so it follows the
-  client's chosen currency without a schema change. `GET /rates` reports rate freshness
-  (`{base_currency, updated_at, count}`) and `POST /rates/refresh` runs the fetch on demand (`503`
-  if the source is unreachable) — the same fetch the 12h Celery-beat job runs.
+  client's chosen currency without a schema change. `GET /rates` reports rate freshness and
+  **every stored rate** (`{base_currency, updated_at, count, rates:[{currency, rate_to_base}]}` —
+  the rate list powers the app's currency-converter tool); `POST /rates/refresh` runs the fetch on
+  demand (`503` if the source is unreachable) — the same fetch the 12h Celery-beat job runs.
 
 ## Identifiers
 

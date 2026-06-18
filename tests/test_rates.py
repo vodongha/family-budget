@@ -37,6 +37,18 @@ def test_get_rates_status(
     assert seeded["updated_at"] is not None
 
 
+def test_get_rates_lists_stored_rates(
+    client: TestClient, auth_headers: dict[str, str], db_session: Session
+) -> None:
+    db_session.add(ExchangeRate(currency="USD", rate_to_base=25000.0))
+    db_session.add(ExchangeRate(currency="JPY", rate_to_base=165.0))
+    db_session.commit()
+    body = client.get("/rates", headers=auth_headers).json()
+    by_code = {r["currency"]: r["rate_to_base"] for r in body["rates"]}
+    assert by_code["USD"] == 25000.0
+    assert by_code["JPY"] == 165.0
+
+
 def test_get_rates_requires_auth(client: TestClient) -> None:
     assert client.get("/rates").status_code == 401
 
