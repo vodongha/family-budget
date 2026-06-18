@@ -64,9 +64,10 @@ income/expense together, scoped per family.
 - **Privacy policy** — `GET /privacy?lang=vi|en` serves a public, bilingual HTML page (the
   Google Play store-listing URL; also embedded in-app via a WebView)
 - **Admin panel** — a server-rendered, super-admin-only console at `/admin` (session cookie,
-  separate from the API JWT and the web app). Platform dashboard + audit log now; user/family
-  management and a dependency-freshness panel planned. Admins are bootstrapped with
-  `python -m app.scripts.create_admin` — never via the public API
+  separate from the API JWT and the web app). Responsive (collapsible grouped icon sidebar →
+  drawer on mobile); tables are datatables (sort + search + pagination). Dashboard + read-only
+  Users / Families / Audit lists now; write actions and a dependency-freshness panel planned.
+  Admins are bootstrapped with `python -m app.scripts.create_admin` — never via the public API
 - **Health** — `GET /health` runs `SELECT 1 FROM dual` to verify the ADB connection
 
 ### Planned

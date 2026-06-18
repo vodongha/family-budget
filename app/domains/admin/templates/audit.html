@@ -1,0 +1,24 @@
+{% extends "shell.html" %}
+{% block title %}Audit log{% endblock %}
+{% block heading %}Audit log{% endblock %}
+{% block content %}
+{% if entries %}
+<table class="dt" data-per-page="20">
+  <thead>
+    <tr><th>When</th><th>Action</th><th>Target</th><th>Detail</th></tr>
+  </thead>
+  <tbody>
+    {% for a in entries %}
+    <tr>
+      <td>{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '—' }}</td>
+      <td><code>{{ a.action }}</code></td>
+      <td>{{ a.target_type or '' }} {{ a.target_rid or '' }}</td>
+      <td>{{ a.detail or '' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">No admin actions recorded yet.</div>
+{% endif %}
+{% endblock %}

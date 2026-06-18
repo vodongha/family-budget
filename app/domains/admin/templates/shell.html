@@ -1,25 +1,48 @@
 {% extends "base.html" %}
+{% block bodyclass %}has-sidebar{% endblock %}
+
+{% macro navlink(href, key, label, icon) %}
+  <a href="{{ href }}" class="{{ 'active' if active == key else '' }}">{{ icon|safe }}<span>{{ label }}</span></a>
+{% endmacro %}
+
+{% set ic_dash = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg>' %}
+{% set ic_users = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="5" r="2.6"/><path d="M1.6 14c0-2.5 2-4.2 4.4-4.2S10.4 11.5 10.4 14"/><path d="M11 3.2a2.4 2.4 0 0 1 0 4.6M11.6 9.9c1.6.4 2.9 1.9 2.9 4.1"/></svg>' %}
+{% set ic_family = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7.5 8 2.5l6 5"/><path d="M3.2 6.8V14h9.6V6.8"/><rect x="6.4" y="9.4" width="3.2" height="4.6"/></svg>' %}
+{% set ic_audit = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="1.8" width="11" height="12.4" rx="1.2"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>' %}
+{% set ic_logout = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2.5H3.2A1.2 1.2 0 0 0 2 3.7v8.6a1.2 1.2 0 0 0 1.2 1.2H6"/><path d="M9.5 11 13 8 9.5 5M13 8H6"/></svg>' %}
+{% set ic_menu = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>' %}
+
 {% block body %}
-<div class="layout">
+<div class="app">
   <aside class="sidebar">
     <div class="brand">Famo <span>Admin</span></div>
     <nav class="nav">
-      <a href="/admin" class="{{ 'active' if active == 'dashboard' else '' }}">Dashboard</a>
-      <a href="/admin/users" class="{{ 'active' if active == 'users' else '' }}">Users</a>
-      <a href="/admin/families" class="{{ 'active' if active == 'families' else '' }}">Families</a>
-      <a href="/admin/audit" class="{{ 'active' if active == 'audit' else '' }}">Audit log</a>
+      <div class="nav-group">
+        <div class="grp-label">Overview</div>
+        {{ navlink('/admin', 'dashboard', 'Dashboard', ic_dash) }}
+      </div>
+      <div class="nav-group">
+        <div class="grp-label">Manage</div>
+        {{ navlink('/admin/users', 'users', 'Users', ic_users) }}
+        {{ navlink('/admin/families', 'families', 'Families', ic_family) }}
+      </div>
+      <div class="nav-group">
+        <div class="grp-label">System</div>
+        {{ navlink('/admin/audit', 'audit', 'Audit log', ic_audit) }}
+      </div>
     </nav>
   </aside>
+  <div class="sb-backdrop"></div>
+
   <main class="main">
     <div class="topbar">
+      <button class="icon-btn" type="button" onclick="toggleSidebar()" aria-label="Toggle menu">{{ ic_menu|safe }}</button>
       <h1>{% block heading %}{% endblock %}</h1>
-      <div style="display:flex; align-items:center; gap:12px;">
-        <span class="who">{{ admin.display_name }} · {{ admin.email }}</span>
-        <form method="post" action="/admin/logout" style="margin:0;">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <button class="btn" type="submit">Sign out</button>
-        </form>
-      </div>
+      <span class="who">{{ admin.email }}</span>
+      <form method="post" action="/admin/logout" style="margin:0;">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="icon-btn" type="submit" title="Sign out" aria-label="Sign out">{{ ic_logout|safe }}</button>
+      </form>
     </div>
     {% block content %}{% endblock %}
   </main>

@@ -106,6 +106,60 @@ def dashboard(
     )
 
 
+@router.get("/users", response_class=HTMLResponse)
+def users_page(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "users.html",
+        {
+            "admin": admin,
+            "csrf": csrf_token(request),
+            "active": "users",
+            "users": AdminService(session).list_users(),
+        },
+    )
+
+
+@router.get("/families", response_class=HTMLResponse)
+def families_page(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "families.html",
+        {
+            "admin": admin,
+            "csrf": csrf_token(request),
+            "active": "families",
+            "rows": AdminService(session).list_families(),
+        },
+    )
+
+
+@router.get("/audit", response_class=HTMLResponse)
+def audit_page(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "audit.html",
+        {
+            "admin": admin,
+            "csrf": csrf_token(request),
+            "active": "audit",
+            "entries": AdminService(session).recent_audit(limit=500),
+        },
+    )
+
+
 def setup_admin(app: FastAPI) -> None:
     """Wire the admin panel into the app: session middleware, the login-required
     redirect handler, and the router. Call from ``app.main`` before the SPA mount.
