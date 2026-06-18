@@ -285,6 +285,9 @@ and the web iframe can load it. Update `EFFECTIVE_DATE` when the policy text cha
 ### Statistics
 
 `GET /stats/monthly?months=N` (`app/domains/stats/`) returns per-month income/expense totals.
+`GET /stats/calendar?year=&month=` returns per-day income/expense for one month (the calendar
+screen's net markers + day summary), only for days with activity. All stats endpoints take an
+optional `display_currency` and convert their totals to it.
 `GET /stats/by-category?kind=expense|income&months=N` returns per-category totals for one kind,
 sorted by amount descending; uncategorized transactions fold into one bucket (`category_rid`
 null, `default_key` `"uncategorized"`). Aggregation is done **in Python** (not a SQL `GROUP BY`

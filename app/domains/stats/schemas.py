@@ -9,6 +9,12 @@ class MonthlyPoint(BaseModel):
     expense: int
 
 
+class CalendarDay(BaseModel):
+    day: str  # "YYYY-MM-DD"
+    income: int
+    expense: int
+
+
 class CategorySlice(BaseModel):
     # None for the uncategorized bucket (then default_key is "uncategorized").
     category_rid: str | None

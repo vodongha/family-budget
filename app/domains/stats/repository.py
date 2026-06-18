@@ -69,6 +69,30 @@ class StatsRepository:
         )
         return [(r[0], r[1], r[2], r[3]) for r in self._session.execute(stmt).all()]
 
+    def rows_in_range(
+        self, start: date, end: date, wallet_ids: list[int]
+    ) -> list[tuple[date, str, int, str]]:
+        """(occurred_on, type, amount, currency) within ``[start, end)`` (a single
+        month for the calendar), restricted to ``wallet_ids``. Bucketing by day
+        happens in the service for Oracle/SQLite portability."""
+        if not wallet_ids:
+            return []
+        stmt = (
+            select(
+                Transaction.occurred_on,
+                Transaction.type,
+                Transaction.amount,
+                Wallet.currency,
+            )
+            .join(Wallet, Transaction.wallet_id == Wallet.id)
+            .where(
+                Transaction.occurred_on >= start,
+                Transaction.occurred_on < end,
+                Transaction.wallet_id.in_(wallet_ids),
+            )
+        )
+        return [(r[0], r[1], r[2], r[3]) for r in self._session.execute(stmt).all()]
+
     def category_rows_since(
         self, start: date, wallet_ids: list[int]
     ) -> list[CategoryRow]:

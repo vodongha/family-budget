@@ -90,6 +90,56 @@ def test_stats_monthly_in_display_currency(
     assert points[-1]["expense"] == 2000  # 500000 VND / 25000 → $20.00 = 2000 minor
 
 
+def test_calendar_totals_in_display_currency(
+    client: TestClient, auth_headers: dict[str, str], db_session: Session
+) -> None:
+    _seed_rate(db_session, "USD", 25000.0)
+    usd = _new_wallet(client, auth_headers, name="USD", currency="USD")
+    # $20 income + $5 expense on the same day → net rendered in USD.
+    client.post(
+        "/transactions",
+        json={
+            "wallet_rid": usd["rid"],
+            "type": "income",
+            "amount": 2000,
+            "occurred_on": "2026-06-10",
+        },
+        headers=auth_headers,
+    )
+    client.post(
+        "/transactions",
+        json={
+            "wallet_rid": usd["rid"],
+            "type": "expense",
+            "amount": 500,
+            "occurred_on": "2026-06-10",
+        },
+        headers=auth_headers,
+    )
+    days = client.get(
+        "/stats/calendar?year=2026&month=6&display_currency=USD", headers=auth_headers
+    ).json()
+    day = {d["day"]: d for d in days}["2026-06-10"]
+    assert day["income"] == 2000  # $20.00 in USD minor
+    assert day["expense"] == 500  # $5.00
+    # And in the base currency: $20 → 500000 VND, $5 → 125000 VND.
+    base = client.get(
+        "/stats/calendar?year=2026&month=6", headers=auth_headers
+    ).json()
+    base_day = {d["day"]: d for d in base}["2026-06-10"]
+    assert base_day["income"] == 500_000
+    assert base_day["expense"] == 125_000
+
+
+def test_calendar_rejects_bad_month(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    assert (
+        client.get("/stats/calendar?year=2026&month=13", headers=auth_headers).status_code
+        == 422
+    )
+
+
 def test_budget_amount_round_trips_through_display_currency(
     client: TestClient, auth_headers: dict[str, str], db_session: Session
 ) -> None:
