@@ -22,6 +22,15 @@ class MonthlyPoint:
         self.expense = expense
 
 
+class DayPoint:
+    """A single calendar day's income/expense totals (in the display currency)."""
+
+    def __init__(self, day: str, income: int, expense: int) -> None:
+        self.day = day  # "YYYY-MM-DD"
+        self.income = income
+        self.expense = expense
+
+
 class CategorySlice:
     """Total spent/earned under one category over the window.
 
@@ -118,6 +127,57 @@ class StatsService:
                 converter.base_to_target(expense[(y, m)]),
             )
             for (y, m) in window
+        ]
+
+    def calendar(
+        self,
+        family_id: int | None,
+        user_id: int,
+        year: int,
+        month: int,
+        scope: str = WalletScope.ALL.value,
+        display_currency: str = BASE_CURRENCY,
+    ) -> list[DayPoint]:
+        """Per-day income/expense for one month, in ``display_currency``. Includes
+        boundary-crossing transfers (like the other stats); internal transfers are
+        excluded. Only days with activity are returned."""
+        start = date(year, month, 1)
+        end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+        wallet_ids = self._wallets.visible_wallet_ids(family_id, user_id, scope)
+
+        converter = CurrencyConverter(self._session, display_currency)
+        income: dict[str, int] = {}
+        expense: dict[str, int] = {}
+        for occurred_on, type_, amount, currency in self._repo.rows_in_range(
+            start, end, wallet_ids
+        ):
+            base = converter.to_base(amount, currency)
+            key = occurred_on.isoformat()
+            if type_ == "income":
+                income[key] = income.get(key, 0) + base
+            elif type_ == "expense":
+                expense[key] = expense.get(key, 0) + base
+
+        for occurred_on, type_, amount, currency in self._txns.boundary_transfer_legs(
+            wallet_ids, start
+        ):
+            if occurred_on >= end:
+                continue
+            base = converter.to_base(amount, currency)
+            key = occurred_on.isoformat()
+            if type_ == TransactionType.TRANSFER_IN.value:
+                income[key] = income.get(key, 0) + base
+            else:
+                expense[key] = expense.get(key, 0) + base
+
+        days = sorted(set(income) | set(expense))
+        return [
+            DayPoint(
+                d,
+                converter.base_to_target(income.get(d, 0)),
+                converter.base_to_target(expense.get(d, 0)),
+            )
+            for d in days
         ]
 
     def by_category(

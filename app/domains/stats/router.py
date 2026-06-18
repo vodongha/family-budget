@@ -1,10 +1,10 @@
 """Statistics routes — family-scoped, read-only."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.core.deps import CurrentUser, DisplayCurrency, OptionalFamily, SessionDep
 from app.domains.categories.models import CategoryKind
-from app.domains.stats.schemas import CategorySlice, MonthlyPoint
+from app.domains.stats.schemas import CalendarDay, CategorySlice, MonthlyPoint
 from app.domains.stats.service import StatsService
 from app.domains.wallets.models import WalletScope
 
@@ -32,6 +32,31 @@ def monthly(
     return [
         MonthlyPoint(month=p.month, income=p.income, expense=p.expense)
         for p in points
+    ]
+
+
+@router.get(
+    "/calendar",
+    response_model=list[CalendarDay],
+    summary="Per-day totals for a month",
+)
+def calendar(
+    session: SessionDep,
+    family_id: OptionalFamily,
+    current_user: CurrentUser,
+    display_currency: DisplayCurrency,
+    year: int = Query(ge=2000, le=2100),
+    month: int = Query(ge=1, le=12),
+    scope: WalletScope = WalletScope.ALL,
+) -> list[CalendarDay]:
+    """Income/expense per day for the given month, in `display_currency`. Only days
+    with activity are returned; boundary-crossing transfers count, internal ones
+    don't."""
+    points = StatsService(session).calendar(
+        family_id, current_user.id, year, month, scope.value, display_currency
+    )
+    return [
+        CalendarDay(day=p.day, income=p.income, expense=p.expense) for p in points
     ]
 
 
