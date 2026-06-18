@@ -109,6 +109,9 @@ class AdminRepository:
             select(User).options(joinedload(User.family)).where(User.rid == rid)
         )
 
+    def get_family_by_rid(self, rid: str) -> Family | None:
+        return self._session.scalar(select(Family).where(Family.rid == rid))
+
     def get_wallet_by_rid(self, rid: str) -> Wallet | None:
         return self._session.scalar(select(Wallet).where(Wallet.rid == rid))
 
@@ -152,6 +155,40 @@ class AdminRepository:
                 select(Category)
                 .where(where, Category.is_archived == false())
                 .order_by(Category.name)
+            ).all()
+        )
+
+    def family_wallets(self, family_id: int) -> list[Wallet]:
+        return list(
+            self._session.scalars(
+                select(Wallet)
+                .where(Wallet.family_id == family_id)
+                .order_by(Wallet.created_at)
+            ).all()
+        )
+
+    def family_categories(self, family_id: int) -> list[Category]:
+        return list(
+            self._session.scalars(
+                select(Category)
+                .where(Category.family_id == family_id, Category.is_archived == false())
+                .order_by(Category.kind, Category.name)
+            ).all()
+        )
+
+    def get_budget_by_rid(self, rid: str):  # type: ignore[no-untyped-def]
+        from app.domains.budgets.models import Budget
+
+        return self._session.scalar(select(Budget).where(Budget.rid == rid))
+
+    def family_budgets(self, family_id: int):  # type: ignore[no-untyped-def]
+        from app.domains.budgets.models import Budget
+
+        return list(
+            self._session.scalars(
+                select(Budget)
+                .options(selectinload(Budget.category))
+                .where(Budget.family_id == family_id)
             ).all()
         )
 

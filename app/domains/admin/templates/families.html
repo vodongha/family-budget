@@ -12,7 +12,7 @@
   <tbody>
     {% for r in rows %}
     <tr>
-      <td>{{ r.family.name }}</td>
+      <td><a href="/admin/families/{{ r.family.rid }}">{{ r.family.name }}</a></td>
       <td>{{ r.members }}</td>
       <td>{{ r.wallets }}</td>
       <td>{% if r.family.is_deleted %}<span class="pill pill-warn">deleted</span>{% else %}<span class="pill pill-ok">active</span>{% endif %}</td>

@@ -228,6 +228,102 @@ class AdminService:
         self._session.commit()
         return len(legs)
 
+    # --- families ------------------------------------------------------------
+
+    def get_family(self, rid: str):  # type: ignore[no-untyped-def]
+        return self._repo.get_family_by_rid(rid)
+
+    def family_overview(self, family) -> dict[str, object]:  # type: ignore[no-untyped-def]
+        from app.domains.families.repository import FamilyRepository
+
+        wallets = self._repo.family_wallets(family.id)
+        balances = self._wallets.balances_by_wallet([w.id for w in wallets])
+        return {
+            "members": FamilyRepository(self._session).list_active_members(family.id),
+            "wallets": [{"wallet": w, "balance": balances.get(w.id, 0)} for w in wallets],
+            "categories": self._repo.family_categories(family.id),
+            "budgets": self._repo.family_budgets(family.id),
+        }
+
+    def rename_family(self, family, name: str) -> None:  # type: ignore[no-untyped-def]
+        family.name = name.strip()
+        self._session.commit()
+
+    def set_family_deleted(self, family, deleted: bool) -> None:  # type: ignore[no-untyped-def]
+        family.is_deleted = deleted
+        family.deleted_at = self.now() if deleted else None
+        self._session.commit()
+
+    # --- wallets (edit / delete) --------------------------------------------
+
+    def rename_wallet(self, wallet: Wallet, name: str) -> None:
+        wallet.name = name.strip()
+        self._session.commit()
+
+    def delete_wallet(self, wallet: Wallet) -> int:
+        removed = self._wallets.delete_with_transactions(wallet.id)
+        self._session.commit()
+        return removed
+
+    # --- categories ----------------------------------------------------------
+
+    def add_category(self, family, *, name, icon, color, kind):  # type: ignore[no-untyped-def]
+        from app.domains.categories.models import CategoryKind
+        from app.domains.categories.repository import CategoryRepository
+
+        cat = CategoryRepository(self._session).add(
+            family_id=family.id,
+            owner_user_id=None,
+            name=name.strip(),
+            icon=(icon or "").strip() or None,
+            color=(color or "").strip() or None,
+            kind=CategoryKind(kind),
+        )
+        self._session.commit()
+        return cat
+
+    def update_category(self, category, *, name, icon, color):  # type: ignore[no-untyped-def]
+        category.name = name.strip()
+        category.icon = (icon or "").strip() or None
+        category.color = (color or "").strip() or None
+        self._session.commit()
+
+    def delete_category(self, category) -> None:  # type: ignore[no-untyped-def]
+        from app.domains.categories.repository import CategoryRepository
+
+        repo = CategoryRepository(self._session)
+        repo.clear_from_transactions(category.id)
+        repo.delete(category)
+        self._session.commit()
+
+    # --- budgets -------------------------------------------------------------
+
+    def get_budget(self, rid: str):  # type: ignore[no-untyped-def]
+        return self._repo.get_budget_by_rid(rid)
+
+    def add_budget(self, family, *, category, amount_base: int, actor):  # type: ignore[no-untyped-def]
+        from app.domains.budgets.repository import BudgetRepository
+
+        budget = BudgetRepository(self._session).add(
+            family_id=family.id,
+            owner_user_id=None,
+            category_id=category.id,
+            amount=amount_base,
+            created_by_user_id=actor.id,
+        )
+        self._session.commit()
+        return budget
+
+    def update_budget(self, budget, amount_base: int) -> None:  # type: ignore[no-untyped-def]
+        budget.amount = amount_base
+        self._session.commit()
+
+    def delete_budget(self, budget) -> None:  # type: ignore[no-untyped-def]
+        from app.domains.budgets.repository import BudgetRepository
+
+        BudgetRepository(self._session).delete(budget)
+        self._session.commit()
+
     @staticmethod
     def now() -> datetime:
         from datetime import UTC

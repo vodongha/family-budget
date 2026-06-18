@@ -47,44 +47,40 @@
 <section>
   <h2>Wallets</h2>
   {% if wallets %}
-  <div class="dt-scroll">
-    <table>
-      <thead><tr><th>Name</th><th>Currency</th><th>Visibility</th><th>Balance</th><th></th></tr></thead>
-      <tbody>
-        {% for w in wallets %}
-        <tr>
-          <td>{{ w.wallet.name }}</td>
-          <td>{{ w.wallet.currency }}</td>
-          <td>{{ w.wallet.visibility }}</td>
-          <td>{{ w.balance | money(w.wallet.currency) }} {{ w.wallet.currency }}</td>
-          <td><a href="/admin/wallets/{{ w.wallet.rid }}">Open</a></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <table class="dt" data-per-page="10">
+    <thead><tr><th>Name</th><th>Currency</th><th>Visibility</th><th>Balance</th><th data-nosort></th></tr></thead>
+    <tbody>
+      {% for w in wallets %}
+      <tr>
+        <td>{{ w.wallet.name }}</td>
+        <td>{{ w.wallet.currency }}</td>
+        <td>{{ w.wallet.visibility }}</td>
+        <td>{{ w.balance | money(w.wallet.currency) }} {{ w.wallet.currency }}</td>
+        <td><a href="/admin/wallets/{{ w.wallet.rid }}">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
   {% else %}<div class="empty">No wallets.</div>{% endif %}
 </section>
 
 <section>
   <h2>Recent transactions (created by this user)</h2>
   {% if txns %}
-  <div class="dt-scroll">
-    <table>
-      <thead><tr><th>Date</th><th>Wallet</th><th>Type</th><th>Amount</th><th>Note</th></tr></thead>
-      <tbody>
-        {% for t in txns %}
-        <tr>
-          <td>{{ t.occurred_on.isoformat() }}</td>
-          <td><a href="/admin/wallets/{{ t.wallet.rid }}">{{ t.wallet.name }}</a></td>
-          <td>{{ t.type }}</td>
-          <td>{{ t.amount | money(t.wallet.currency) }} {{ t.wallet.currency }}</td>
-          <td>{{ t.note or '' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <table class="dt" data-per-page="10">
+    <thead><tr><th>Date</th><th>Wallet</th><th>Type</th><th>Amount</th><th>Note</th></tr></thead>
+    <tbody>
+      {% for t in txns %}
+      <tr>
+        <td>{{ t.occurred_on.isoformat() }}</td>
+        <td><a href="/admin/wallets/{{ t.wallet.rid }}">{{ t.wallet.name }}</a></td>
+        <td>{{ t.type }}</td>
+        <td>{{ t.amount | money(t.wallet.currency) }} {{ t.wallet.currency }}</td>
+        <td>{{ t.note or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
   {% else %}<div class="empty">No transactions.</div>{% endif %}
 </section>
 {% endblock %}

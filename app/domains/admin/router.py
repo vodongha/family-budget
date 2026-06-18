@@ -30,6 +30,7 @@ from app.domains.admin.security import (
     verify_csrf,
 )
 from app.domains.admin.service import AdminService
+from app.domains.categories.models import CategoryKind
 from app.domains.transactions.models import TransactionType
 from app.domains.users.models import User, UserRole
 
@@ -632,6 +633,307 @@ def transactions_page(
             base_url="/admin/transactions",
         ),
     )
+
+
+# --- family detail + management (P4) ---------------------------------------
+
+
+@router.get("/families/{rid}", response_class=HTMLResponse, response_model=None)
+def family_detail(
+    request: Request, session: SessionDep, admin: CurrentAdmin, rid: str
+) -> HTMLResponse | RedirectResponse:
+    svc = AdminService(session)
+    family = svc.get_family(rid)
+    if family is None:
+        flash(request, "Family not found.", "error")
+        return RedirectResponse("/admin/families", status_code=_REDIRECT)
+    overview = svc.family_overview(family)
+    return templates.TemplateResponse(
+        request,
+        "family_detail.html",
+        _ctx(
+            request,
+            admin,
+            "families",
+            crumbs=[
+                {"label": "Families", "href": "/admin/families"},
+                {"label": family.name},
+            ],
+            family=family,
+            kinds=[k.value for k in CategoryKind],
+            **overview,
+        ),
+    )
+
+
+def _load_family(
+    request: Request, svc: AdminService, rid: str, csrf: str
+) -> Any | RedirectResponse:
+    if not _check_csrf(request, csrf):
+        return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
+    family = svc.get_family(rid)
+    if family is None:
+        flash(request, "Family not found.", "error")
+        return RedirectResponse("/admin/families", status_code=_REDIRECT)
+    return family
+
+
+@router.post("/families/{rid}/rename")
+def family_rename(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    name: Annotated[str, Form()] = "",
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    family = _load_family(request, svc, rid, csrf)
+    if isinstance(family, RedirectResponse):
+        return family
+    if not name.strip():
+        flash(request, "Name is required.", "error")
+    else:
+        svc.rename_family(family, name)
+        svc.log(admin, "family.rename", target_type="family", target_rid=family.rid)
+        flash(request, "Family renamed.")
+    return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
+
+
+@router.post("/families/{rid}/delete")
+def family_delete(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    family = _load_family(request, svc, rid, csrf)
+    if isinstance(family, RedirectResponse):
+        return family
+    svc.set_family_deleted(family, True)
+    svc.log(admin, "family.soft_delete", target_type="family", target_rid=family.rid)
+    flash(request, "Family soft-deleted.", "warn")
+    return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
+
+
+@router.post("/families/{rid}/restore")
+def family_restore(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    family = _load_family(request, svc, rid, csrf)
+    if isinstance(family, RedirectResponse):
+        return family
+    svc.set_family_deleted(family, False)
+    svc.log(admin, "family.restore", target_type="family", target_rid=family.rid)
+    flash(request, "Family restored.")
+    return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
+
+
+# --- wallet edit / delete ---------------------------------------------------
+
+
+@router.post("/wallets/{rid}/rename")
+def wallet_rename(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    name: Annotated[str, Form()] = "",
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    wallet = svc.get_wallet(rid)
+    if wallet is None:
+        flash(request, "Wallet not found.", "error")
+        return RedirectResponse("/admin/users", status_code=_REDIRECT)
+    if _check_csrf(request, csrf) and name.strip():
+        svc.rename_wallet(wallet, name)
+        svc.log(admin, "wallet.rename", target_type="wallet", target_rid=wallet.rid)
+        flash(request, "Wallet renamed.")
+    return RedirectResponse(f"/admin/wallets/{rid}", status_code=_REDIRECT)
+
+
+@router.post("/wallets/{rid}/delete")
+def wallet_delete(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    wallet = svc.get_wallet(rid)
+    if wallet is None:
+        flash(request, "Wallet not found.", "error")
+        return RedirectResponse("/admin/users", status_code=_REDIRECT)
+    if not _check_csrf(request, csrf):
+        return RedirectResponse(f"/admin/wallets/{rid}", status_code=_REDIRECT)
+    removed = svc.delete_wallet(wallet)
+    svc.log(
+        admin,
+        "wallet.delete",
+        target_type="wallet",
+        target_rid=rid,
+        detail=f"removed {removed} transactions",
+    )
+    flash(request, f"Wallet deleted ({removed} transactions removed).", "warn")
+    return RedirectResponse("/admin/users", status_code=_REDIRECT)
+
+
+# --- categories CRUD --------------------------------------------------------
+
+
+@router.post("/families/{rid}/categories")
+def category_add(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    name: Annotated[str, Form()] = "",
+    icon: Annotated[str, Form()] = "",
+    color: Annotated[str, Form()] = "",
+    kind: Annotated[str, Form()] = CategoryKind.EXPENSE.value,
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    family = _load_family(request, svc, rid, csrf)
+    if isinstance(family, RedirectResponse):
+        return family
+    if kind not in (CategoryKind.EXPENSE.value, CategoryKind.INCOME.value) or not name.strip():
+        flash(request, "Name and a valid kind are required.", "error")
+        return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
+    cat = svc.add_category(family, name=name, icon=icon, color=color, kind=kind)
+    svc.log(admin, "category.create", target_type="category", target_rid=cat.rid)
+    flash(request, "Category added.")
+    return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
+
+
+@router.post("/categories/{rid}/edit")
+def category_edit(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    name: Annotated[str, Form()] = "",
+    icon: Annotated[str, Form()] = "",
+    color: Annotated[str, Form()] = "",
+    family_rid: Annotated[str, Form()] = "",
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    back = f"/admin/families/{family_rid}"
+    cat = svc.get_category(rid)
+    if cat is None:
+        flash(request, "Category not found.", "error")
+        return RedirectResponse(back, status_code=_REDIRECT)
+    if _check_csrf(request, csrf) and name.strip():
+        svc.update_category(cat, name=name, icon=icon, color=color)
+        svc.log(admin, "category.edit", target_type="category", target_rid=cat.rid)
+        flash(request, "Category updated.")
+    return RedirectResponse(back, status_code=_REDIRECT)
+
+
+@router.post("/categories/{rid}/delete")
+def category_delete(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    family_rid: Annotated[str, Form()] = "",
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    back = f"/admin/families/{family_rid}"
+    cat = svc.get_category(rid)
+    if cat is None:
+        flash(request, "Category not found.", "error")
+        return RedirectResponse(back, status_code=_REDIRECT)
+    if _check_csrf(request, csrf):
+        svc.delete_category(cat)
+        svc.log(admin, "category.delete", target_type="category", target_rid=rid)
+        flash(request, "Category deleted (its transactions are now uncategorized).", "warn")
+    return RedirectResponse(back, status_code=_REDIRECT)
+
+
+# --- budgets CRUD -----------------------------------------------------------
+
+
+@router.post("/families/{rid}/budgets")
+def budget_add(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    category_rid: Annotated[str, Form()] = "",
+    amount: Annotated[str, Form()] = "",
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    family = _load_family(request, svc, rid, csrf)
+    if isinstance(family, RedirectResponse):
+        return family
+    cat = svc.get_category(category_rid) if category_rid else None
+    minor = to_minor(amount, "VND")
+    if cat is None or minor is None or minor <= 0:
+        flash(request, "Pick a category and a positive amount.", "error")
+        return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
+    budget = svc.add_budget(family, category=cat, amount_base=minor, actor=admin)
+    svc.log(admin, "budget.create", target_type="budget", target_rid=budget.rid)
+    flash(request, "Budget added.")
+    return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
+
+
+@router.post("/budgets/{rid}/edit")
+def budget_edit(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    amount: Annotated[str, Form()] = "",
+    family_rid: Annotated[str, Form()] = "",
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    back = f"/admin/families/{family_rid}"
+    budget = svc.get_budget(rid)
+    if budget is None:
+        flash(request, "Budget not found.", "error")
+        return RedirectResponse(back, status_code=_REDIRECT)
+    minor = to_minor(amount, "VND")
+    if _check_csrf(request, csrf) and minor is not None and minor > 0:
+        svc.update_budget(budget, minor)
+        svc.log(admin, "budget.edit", target_type="budget", target_rid=budget.rid)
+        flash(request, "Budget updated.")
+    return RedirectResponse(back, status_code=_REDIRECT)
+
+
+@router.post("/budgets/{rid}/delete")
+def budget_delete(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    family_rid: Annotated[str, Form()] = "",
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    back = f"/admin/families/{family_rid}"
+    budget = svc.get_budget(rid)
+    if budget is None:
+        flash(request, "Budget not found.", "error")
+        return RedirectResponse(back, status_code=_REDIRECT)
+    if _check_csrf(request, csrf):
+        svc.delete_budget(budget)
+        svc.log(admin, "budget.delete", target_type="budget", target_rid=rid)
+        flash(request, "Budget deleted.", "warn")
+    return RedirectResponse(back, status_code=_REDIRECT)
 
 
 def setup_admin(app: FastAPI) -> None:
