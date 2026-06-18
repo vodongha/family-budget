@@ -119,6 +119,41 @@
     .empty { color: var(--muted); padding: 14px; }
     code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }
 
+    /* ---- breadcrumb ---- */
+    .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+    .crumbs a { color: var(--muted); }
+    .crumbs a:hover { color: var(--text); }
+    .crumbs .sep { opacity: .5; }
+    .crumbs .cur { color: var(--text); }
+
+    /* ---- flash messages ---- */
+    .flashes { margin-bottom: 16px; display: grid; gap: 8px; }
+    .flash { padding: 9px 12px; border-radius: 8px; font-size: 13px; border: 1px solid; }
+    .flash-ok { background: rgba(63,185,80,.12); color: var(--ok); border-color: var(--ok); }
+    .flash-warn { background: rgba(210,153,34,.12); color: var(--warn); border-color: var(--warn); }
+    .flash-error { background: rgba(248,81,73,.12); color: var(--danger); border-color: var(--danger); }
+
+    /* ---- forms ---- */
+    .form { max-width: 520px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 9px 11px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font: inherit;
+    }
+    .field .hint { color: var(--muted); font-size: 12px; margin-top: 5px; }
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .form-row .field { flex: 1; min-width: 160px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+    .btn-primary { background: var(--primary); color: #fff; border: none; padding: 9px 16px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; }
+    .check { display: flex; align-items: center; gap: 8px; }
+    .check input { width: auto; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 12px; margin-bottom: 8px; }
+    .kv { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+    .kv .k { color: var(--muted); font-size: 12px; }
+    .kv .v { margin-top: 4px; font-weight: 600; word-break: break-word; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 6px 0 16px; }
+
     /* ---- desktop vs mobile toggle visibility ---- */
     @media (min-width: 861px) { .sb-burger { display: none !important; } }
     @media (max-width: 860px) {

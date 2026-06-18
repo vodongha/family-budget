@@ -9,6 +9,7 @@
 {% set ic_users = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="5" r="2.6"/><path d="M1.6 14c0-2.5 2-4.2 4.4-4.2S10.4 11.5 10.4 14"/><path d="M11 3.2a2.4 2.4 0 0 1 0 4.6M11.6 9.9c1.6.4 2.9 1.9 2.9 4.1"/></svg>' %}
 {% set ic_family = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7.5 8 2.5l6 5"/><path d="M3.2 6.8V14h9.6V6.8"/><rect x="6.4" y="9.4" width="3.2" height="4.6"/></svg>' %}
 {% set ic_audit = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="1.8" width="11" height="12.4" rx="1.2"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>' %}
+{% set ic_txn = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 5.5h9l-2-2M13.5 10.5h-9l2 2"/></svg>' %}
 {% set ic_logout = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2.5H3.2A1.2 1.2 0 0 0 2 3.7v8.6a1.2 1.2 0 0 0 1.2 1.2H6"/><path d="M9.5 11 13 8 9.5 5M13 8H6"/></svg>' %}
 {% set ic_menu = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>' %}
 {% set ic_collapse = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3.5 5.5 8 10 12.5"/><path d="M13.5 3.5 9 8l4.5 4.5"/></svg>' %}
@@ -32,6 +33,7 @@
         <div class="grp-items">
           {{ navlink('/admin/users', 'users', 'Users', ic_users) }}
           {{ navlink('/admin/families', 'families', 'Families', ic_family) }}
+          {{ navlink('/admin/transactions', 'transactions', 'Transactions', ic_txn) }}
         </div>
       </div>
       <div class="nav-group" data-group="system">
@@ -54,6 +56,22 @@
         <button class="icon-btn" type="submit" title="Sign out" aria-label="Sign out">{{ ic_logout|safe }}</button>
       </form>
     </div>
+
+    {% if crumbs %}
+    <nav class="crumbs">
+      {% for c in crumbs %}
+        {% if c.href and not loop.last %}<a href="{{ c.href }}">{{ c.label }}</a><span class="sep">›</span>
+        {% else %}<span class="cur">{{ c.label }}</span>{% endif %}
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    {% if flashes %}
+    <div class="flashes">
+      {% for f in flashes %}<div class="flash flash-{{ f.kind }}">{{ f.message }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
     {% block content %}{% endblock %}
   </main>
 </div>

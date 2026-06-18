@@ -65,9 +65,12 @@ income/expense together, scoped per family.
   Google Play store-listing URL; also embedded in-app via a WebView)
 - **Admin panel** — a server-rendered, super-admin-only console at `/admin` (session cookie,
   separate from the API JWT and the web app). Responsive (collapsible grouped icon sidebar →
-  drawer on mobile); tables are datatables (sort + search + pagination). Dashboard + read-only
-  Users / Families / Audit lists now; write actions and a dependency-freshness panel planned.
-  Admins are bootstrapped with `python -m app.scripts.create_admin` — never via the public API
+  drawer on mobile); tables are datatables (sort + search + pagination). Dashboard, **user
+  management** (edit / soft-delete / restore / reset password / unlink Google) and **transaction
+  CRUD** per wallet + a global server-side-paginated transactions view now; full family/wallet/
+  category/budget management and a dependency panel planned. Admin transaction writes reuse the
+  app's money logic (integer minor units, derived balances); transfers are delete-only. Admins are
+  bootstrapped with `python -m app.scripts.create_admin` — never via the public API
 - **Health** — `GET /health` runs `SELECT 1 FROM dual` to verify the ADB connection
 
 ### Planned

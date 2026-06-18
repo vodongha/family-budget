@@ -5,15 +5,17 @@ operates over all families. These queries intentionally bypass the tenant
 boundary; they must only ever be reached behind ``require_admin``.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import false, func, select, true
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, false, func, or_, select, true
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.domains.admin.models import AdminAuditLog
+from app.domains.categories.models import Category
 from app.domains.transactions.models import Transaction
-from app.domains.users.models import Family, User
-from app.domains.wallets.models import Wallet
+from app.domains.users.models import Family, User, UserRole
+from app.domains.wallets.models import Wallet, WalletScope
+from app.domains.wallets.repository import visibility_clause
 
 
 class AdminRepository:
@@ -99,6 +101,128 @@ class AdminRepository:
 
     def family_wallet_counts(self) -> dict[int, int]:
         return self._counts_by_family(Wallet.family_id)
+
+    # --- single-entity getters (cross-tenant) --------------------------------
+
+    def get_user_by_rid(self, rid: str) -> User | None:
+        return self._session.scalar(
+            select(User).options(joinedload(User.family)).where(User.rid == rid)
+        )
+
+    def get_wallet_by_rid(self, rid: str) -> Wallet | None:
+        return self._session.scalar(select(Wallet).where(Wallet.rid == rid))
+
+    def get_transaction_by_rid(self, rid: str) -> Transaction | None:
+        return self._session.scalar(
+            select(Transaction)
+            .options(
+                selectinload(Transaction.wallet),
+                selectinload(Transaction.category),
+                selectinload(Transaction.creator),
+            )
+            .where(Transaction.rid == rid)
+        )
+
+    def get_category_by_rid(self, rid: str) -> Category | None:
+        return self._session.scalar(select(Category).where(Category.rid == rid))
+
+    def wallets_visible_to(self, user: User) -> list[Wallet]:
+        """Every wallet the given user can see (their family's shared wallets +
+        their own personal wallets)."""
+        return list(
+            self._session.scalars(
+                select(Wallet)
+                .where(visibility_clause(user.family_id, user.id, WalletScope.ALL.value))
+                .order_by(Wallet.created_at)
+            ).all()
+        )
+
+    def categories_for_wallet(self, wallet: Wallet) -> list[Category]:
+        """Categories selectable for a transaction in this wallet — the wallet's
+        family categories plus the wallet owner's personal ones, excluding
+        archived."""
+        conds = []
+        if wallet.family_id is not None:
+            conds.append(Category.family_id == wallet.family_id)
+        if wallet.owner_user_id is not None:
+            conds.append(Category.owner_user_id == wallet.owner_user_id)
+        where = or_(*conds) if conds else false()
+        return list(
+            self._session.scalars(
+                select(Category)
+                .where(where, Category.is_archived == false())
+                .order_by(Category.name)
+            ).all()
+        )
+
+    def family_owner_id(self, family_id: int) -> int | None:
+        return self._session.scalar(
+            select(User.id).where(
+                User.family_id == family_id, User.role == UserRole.OWNER.value
+            )
+        )
+
+    def default_actor_for_wallet(self, wallet: Wallet) -> int | None:
+        """A plausible ``created_by_user_id`` for an admin-created transaction in
+        this wallet: the personal owner, else the wallet's creator, else the
+        family owner."""
+        if wallet.owner_user_id is not None:
+            return wallet.owner_user_id
+        if wallet.created_by_user_id is not None:
+            return wallet.created_by_user_id
+        if wallet.family_id is not None:
+            return self.family_owner_id(wallet.family_id)
+        return None
+
+    # --- transactions (server-side paginated, cross-tenant) ------------------
+
+    def transactions_page(
+        self,
+        *,
+        wallet_id: int | None = None,
+        family_id: int | None = None,
+        created_by_user_id: int | None = None,
+        type_: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        page: int = 1,
+        per_page: int = 25,
+    ) -> tuple[list[Transaction], int]:
+        conds = []
+        if wallet_id is not None:
+            conds.append(Transaction.wallet_id == wallet_id)
+        if family_id is not None:
+            conds.append(Transaction.family_id == family_id)
+        if created_by_user_id is not None:
+            conds.append(Transaction.created_by_user_id == created_by_user_id)
+        if type_ is not None:
+            conds.append(Transaction.type == type_)
+        if date_from is not None:
+            conds.append(Transaction.occurred_on >= date_from)
+        if date_to is not None:
+            conds.append(Transaction.occurred_on <= date_to)
+        where = and_(*conds) if conds else true()
+        total = (
+            self._session.scalar(
+                select(func.count()).select_from(Transaction).where(where)
+            )
+            or 0
+        )
+        rows = list(
+            self._session.scalars(
+                select(Transaction)
+                .where(where)
+                .options(
+                    selectinload(Transaction.wallet),
+                    selectinload(Transaction.category),
+                    selectinload(Transaction.creator),
+                )
+                .order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+            ).all()
+        )
+        return rows, total
 
     # --- audit log -----------------------------------------------------------
 

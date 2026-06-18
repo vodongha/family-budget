@@ -1,0 +1,90 @@
+{% extends "shell.html" %}
+{% block title %}{{ user.email }}{% endblock %}
+{% block heading %}{{ user.display_name }}{% endblock %}
+{% block content %}
+
+<div class="detail-grid">
+  <div class="kv"><div class="k">Email</div><div class="v">{{ user.email }}</div></div>
+  <div class="kv"><div class="k">Role</div><div class="v">{{ user.role }}</div></div>
+  <div class="kv"><div class="k">Super-admin</div><div class="v">{{ 'yes' if user.is_superadmin else 'no' }}</div></div>
+  <div class="kv"><div class="k">Family</div><div class="v">{{ user.family_name or '—' }}</div></div>
+  <div class="kv"><div class="k">Phone</div><div class="v">{{ user.phone or '—' }}</div></div>
+  <div class="kv"><div class="k">Google linked</div><div class="v">{{ 'yes' if user.google_sub else 'no' }}</div></div>
+  <div class="kv"><div class="k">Status</div><div class="v">{{ 'deleted' if user.is_deleted else 'active' }}</div></div>
+  <div class="kv"><div class="k">Created</div><div class="v">{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '—' }}</div></div>
+</div>
+
+<div class="toolbar">
+  <a class="btn-primary" href="/admin/users/{{ user.rid }}/edit">Edit</a>
+  {% if user.is_deleted %}
+    <form method="post" action="/admin/users/{{ user.rid }}/restore" style="margin:0;">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Restore</button>
+    </form>
+  {% else %}
+    <form method="post" action="/admin/users/{{ user.rid }}/delete" style="margin:0;"
+          onsubmit="return confirm('Soft-delete this user?');">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-danger" type="submit">Soft-delete</button>
+    </form>
+  {% endif %}
+  {% if user.google_sub %}
+    <form method="post" action="/admin/users/{{ user.rid }}/unlink-google" style="margin:0;"
+          onsubmit="return confirm('Unlink Google from this account?');">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Unlink Google</button>
+    </form>
+  {% endif %}
+</div>
+
+<form method="post" action="/admin/users/{{ user.rid }}/reset-password" class="toolbar"
+      onsubmit="return confirm('Reset this user\'s password?');" style="align-items:flex-end;">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="field" style="margin:0;">
+    <label>Reset password</label>
+    <input name="new_password" type="text" placeholder="new password (≥8 chars)" minlength="8" required>
+  </div>
+  <button class="btn" type="submit">Set password</button>
+</form>
+
+<section>
+  <h2>Wallets</h2>
+  {% if wallets %}
+  <div class="dt-scroll">
+    <table>
+      <thead><tr><th>Name</th><th>Currency</th><th>Visibility</th><th>Balance</th><th></th></tr></thead>
+      <tbody>
+        {% for w in wallets %}
+        <tr>
+          <td>{{ w.wallet.name }}</td>
+          <td>{{ w.wallet.currency }}</td>
+          <td>{{ w.wallet.visibility }}</td>
+          <td>{{ w.balance | money(w.wallet.currency) }} {{ w.wallet.currency }}</td>
+          <td><a href="/admin/wallets/{{ w.wallet.rid }}">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="empty">No wallets.</div>{% endif %}
+</section>
+
+<section>
+  <h2>Recent transactions (created by this user)</h2>
+  {% if txns %}
+  <div class="dt-scroll">
+    <table>
+      <thead><tr><th>Date</th><th>Wallet</th><th>Type</th><th>Amount</th><th>Note</th></tr></thead>
+      <tbody>
+        {% for t in txns %}
+        <tr>
+          <td>{{ t.occurred_on.isoformat() }}</td>
+          <td><a href="/admin/wallets/{{ t.wallet.rid }}">{{ t.wallet.name }}</a></td>
+          <td>{{ t.type }}</td>
+          <td>{{ t.amount | money(t.wallet.currency) }} {{ t.wallet.currency }}</td>
+          <td>{{ t.note or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="empty">No transactions.</div>{% endif %}
+</section>
+{% endblock %}

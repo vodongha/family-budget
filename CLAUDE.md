@@ -307,10 +307,19 @@ Dockerfile's `COPY app ./app`).
   Tables use a **self-contained datatable enhancer** (no CDN) — add `class="dt"` (and optional
   `data-per-page`) and it gains a **page-size selector**, per-column **sort**, a **search** box,
   and **pagination**; mark a non-sortable header with `data-nosort`.
-- **Scope so far:** login/logout, dashboard (platform metrics + recent activity), and read-only
-  **Users / Families / Audit** list pages (datatables). Planned: write actions (edit / soft-delete /
-  restore / purge, all audit-logged) and an Ops **Dependencies** panel reading GitHub Dependabot
-  alerts for both repos (app + backend) to flag outdated / vulnerable libraries.
+- **Management actions reuse the app's services, never raw writes.** Money rules stay intact:
+  admin transaction create/edit/delete go through `TransactionRepository` (integer minor units of
+  the wallet's currency, balances derived) — the admin layer only bypasses the `family_id`/owner
+  tenant guard, never the money logic. `app/domains/admin/money.py` converts a typed amount ↔ minor
+  units for the forms. **Transfers are read-only** in admin — a delete removes both legs (by
+  `transfer_group_rid`); they can't be edited. Every mutation is `AdminService.log(...)`-audited;
+  destructive forms use POST + CSRF + a confirm. Pages get a **breadcrumb** (`crumbs`) and one-shot
+  **flash** messages (`flash` / `pop_flashes`, in the session).
+- **Scope so far:** login/logout; dashboard; **Users** (list → detail → edit; soft-delete / restore
+  / reset-password / unlink-Google); per-**wallet** transaction list with **transaction CRUD**; a
+  global **/admin/transactions** (server-side paginated, type filter); read-only **Families** and
+  **Audit** lists. Planned: full Families / Wallets / Categories / Budgets management and an Ops
+  **Dependencies** panel reading GitHub Dependabot alerts for both repos.
 
 ### Privacy policy (`app/domains/legal/`)
 
