@@ -1,6 +1,7 @@
 """Celery app — broker/backend on Redis, plus the account-purge beat schedule."""
 
 from celery import Celery
+from celery.schedules import crontab
 
 from app.core.config import settings
 from app.core.database import new_session
@@ -17,17 +18,21 @@ celery.conf.update(
     task_track_started=True,
     timezone="Asia/Ho_Chi_Minh",
     enable_utc=True,
+    # Crontab (fixed clock times) rather than relative intervals: an interval
+    # schedule resets its countdown every time the worker restarts (e.g. on each
+    # deploy), so frequent deploys could keep pushing the next run indefinitely.
+    # Crontab fires at the wall-clock time regardless of when beat started.
     beat_schedule={
         # Daily at 03:00 ICT: permanently purge/anonymise accounts whose
         # soft-deletion is older than the retention window.
         "purge-expired-accounts": {
             "task": "app.purge_expired_accounts",
-            "schedule": 24 * 60 * 60.0,
+            "schedule": crontab(hour=3, minute=0),
         },
-        # Every 12h: refresh currency exchange rates from the public source.
+        # Twice a day (00:00 + 12:00 ICT): refresh currency exchange rates.
         "refresh-exchange-rates": {
             "task": "app.refresh_exchange_rates",
-            "schedule": 12 * 60 * 60.0,
+            "schedule": crontab(hour="0,12", minute=0),
         },
     },
 )

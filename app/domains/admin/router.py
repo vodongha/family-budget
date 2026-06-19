@@ -387,32 +387,6 @@ def user_restore(
     return RedirectResponse(f"/admin/users/{rid}", status_code=_REDIRECT)
 
 
-@router.post("/users/{rid}/purge")
-def user_purge(
-    request: Request,
-    session: SessionDep,
-    admin: CurrentAdmin,
-    rid: str,
-    csrf: Annotated[str, Form()] = "",
-) -> RedirectResponse:
-    res = _user_action(request, session, admin, rid, csrf)
-    if isinstance(res, RedirectResponse):
-        return res
-    svc, user = res
-    if user.id == admin.id:
-        flash(request, "You can't permanently delete your own account.", "error")
-        return RedirectResponse(f"/admin/users/{rid}", status_code=_REDIRECT)
-    summary = svc.hard_delete_user(user)
-    svc.log(admin, "user.hard_delete", target_type="user", target_rid=rid, detail=str(summary))
-    flash(
-        request,
-        "User permanently deleted "
-        f"({summary['transactions']} transactions, {summary['wallets']} wallets removed).",
-        "warn",
-    )
-    return RedirectResponse("/admin/users", status_code=_REDIRECT)
-
-
 @router.post("/users/{rid}/reset-password")
 def user_reset_password(
     request: Request,
@@ -788,25 +762,6 @@ def family_delete(
     svc.log(admin, "family.soft_delete", target_type="family", target_rid=family.rid)
     flash(request, "Family soft-deleted.", "warn")
     return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
-
-
-@router.post("/families/{rid}/purge")
-def family_purge(
-    request: Request,
-    session: SessionDep,
-    admin: CurrentAdmin,
-    rid: str,
-    csrf: Annotated[str, Form()] = "",
-) -> RedirectResponse:
-    svc = AdminService(session)
-    family = _load_family(request, svc, rid, csrf)
-    if isinstance(family, RedirectResponse):
-        return family
-    name = family.name
-    svc.purge_family(family)
-    svc.log(admin, "family.purge", target_type="family", target_rid=rid, detail=name)
-    flash(request, f"Family '{name}' permanently deleted; members detached.", "warn")
-    return RedirectResponse("/admin/families", status_code=_REDIRECT)
 
 
 @router.post("/families/{rid}/restore")

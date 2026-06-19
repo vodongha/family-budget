@@ -376,7 +376,8 @@ def test_create_user(client: TestClient, db_session: Session) -> None:
     assert "fresh@example.com" in client.get("/admin/users").text
 
 
-def test_hard_delete_user_cascades(client: TestClient, db_session: Session) -> None:
+def test_user_delete_is_soft_only(client: TestClient, db_session: Session) -> None:
+    # Admin user deletion only flags is_deleted — real data is never removed.
     from app.domains.transactions.models import Transaction, TransactionType
 
     _make_admin(db_session)
@@ -395,41 +396,48 @@ def test_hard_delete_user_cascades(client: TestClient, db_session: Session) -> N
     )
     db_session.commit()
     _login(client)
+    # The permanent-delete route no longer exists.
     csrf = _csrf_from(client, f"/admin/users/{owner.rid}")
-    res = client.post(
-        f"/admin/users/{owner.rid}/purge", data={"csrf": csrf}, follow_redirects=False
-    )
-    assert res.status_code == 303
-    assert db_session.scalar(select(User).where(User.id == owner.id)) is None
     assert (
-        db_session.scalar(select(Wallet).where(Wallet.id == wallet.id)) is None
+        client.post(
+            f"/admin/users/{owner.rid}/purge", data={"csrf": csrf}, follow_redirects=False
+        ).status_code
+        == 404
     )
+    # Soft-delete flags the user but keeps the user, wallet and transaction.
+    client.post(
+        f"/admin/users/{owner.rid}/delete", data={"csrf": csrf}, follow_redirects=False
+    )
+    db_session.refresh(owner)
+    assert owner.is_deleted is True
+    assert db_session.scalar(select(Wallet).where(Wallet.id == wallet.id)) is not None
     assert (
         db_session.scalar(
             select(func.count()).select_from(Transaction).where(
                 Transaction.created_by_user_id == owner.id
             )
         )
-        == 0
+        == 1
     )
 
 
-def test_family_purge_detaches_members(client: TestClient, db_session: Session) -> None:
+def test_family_delete_is_soft_only(client: TestClient, db_session: Session) -> None:
     _make_admin(db_session)
     fam = _make_family(db_session)
-    member = _make_user(db_session, email="member@example.com")
-    member.family_id = fam.id
-    db_session.commit()
     _login(client)
     csrf = _csrf_from(client, f"/admin/families/{fam.rid}")
-    res = client.post(
-        f"/admin/families/{fam.rid}/purge", data={"csrf": csrf}, follow_redirects=False
+    # No permanent-delete route; soft-delete just flags the family.
+    assert (
+        client.post(
+            f"/admin/families/{fam.rid}/purge", data={"csrf": csrf}, follow_redirects=False
+        ).status_code
+        == 404
     )
-    assert res.status_code == 303
-    assert db_session.scalar(select(Family).where(Family.id == fam.id)) is None
-    # Member account survives, detached from the family.
-    db_session.refresh(member)
-    assert member.family_id is None
+    client.post(
+        f"/admin/families/{fam.rid}/delete", data={"csrf": csrf}, follow_redirects=False
+    )
+    db_session.refresh(fam)
+    assert fam.is_deleted is True
 
 
 def test_wallet_rename_and_delete(client: TestClient, db_session: Session) -> None:
