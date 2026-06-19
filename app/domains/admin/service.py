@@ -15,7 +15,7 @@ from app.domains.admin.models import AdminAuditLog
 from app.domains.admin.repository import AdminRepository
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.repository import TransactionRepository
-from app.domains.users.models import User
+from app.domains.users.models import Family, User
 from app.domains.wallets.models import Wallet
 from app.domains.wallets.repository import WalletRepository
 
@@ -107,6 +107,124 @@ class AdminService:
         wallets = self._repo.wallets_visible_to(user)
         balances = self._wallets.balances_by_wallet([w.id for w in wallets])
         return [{"wallet": w, "balance": balances.get(w.id, 0)} for w in wallets]
+
+    def create_user(
+        self,
+        *,
+        email: str,
+        password: str,
+        display_name: str,
+        phone: str | None,
+        role: str,
+        is_superadmin: bool,
+        family_id: int | None,
+    ) -> User:
+        from app.domains.categories.repository import CategoryRepository
+        from app.domains.users.models import new_rid
+
+        user = User(
+            rid=new_rid(),
+            email=email.strip().lower(),
+            hashed_password=hash_password(password),
+            display_name=display_name.strip(),
+            phone=(phone or "").strip() or None,
+            family_id=family_id,
+            role=role,
+            is_superadmin=is_superadmin,
+        )
+        self._session.add(user)
+        self._session.flush()
+        # Seed a personal category set so a family-less account is usable at once
+        # (mirrors registration); family accounts already have their own set.
+        if family_id is None:
+            CategoryRepository(self._session).seed_defaults(owner_user_id=user.id)
+        self._session.commit()
+        return user
+
+    def hard_delete_user(self, user: User) -> dict[str, int]:
+        """Permanently delete a user **and all their related data** — every
+        transaction they created (family or personal, both transfer legs), their
+        personal wallets, their budgets and personal categories, and their
+        invitations. Shared wallets they created keep their rows (the creator
+        link is just cleared); shared categories stay. Returns a small summary.
+        """
+        from sqlalchemy import delete, or_, update
+
+        from app.domains.budgets.models import Budget
+        from app.domains.categories.models import Category
+        from app.domains.invitations.models import Invitation
+        from app.domains.transactions.models import Transaction
+        from app.domains.wallets.models import Wallet
+
+        uid = user.id
+        s = self._session
+        summary = {"transactions": 0, "wallets": 0, "budgets": 0, "categories": 0}
+
+        # 1) Every transaction this user created (covers family + personal wallets
+        #    and both legs of any transfer). Done first so nothing references the
+        #    wallets/categories removed below.
+        summary["transactions"] = int(
+            s.execute(
+                delete(Transaction).where(Transaction.created_by_user_id == uid)
+            ).rowcount
+            or 0
+        )
+
+        # 2) Personal wallets (owned by this user): drop any residual transactions
+        #    then the wallets.
+        pw_ids = list(s.scalars(select(Wallet.id).where(Wallet.owner_user_id == uid)))
+        if pw_ids:
+            s.execute(delete(Transaction).where(Transaction.wallet_id.in_(pw_ids)))
+            summary["wallets"] = int(
+                s.execute(delete(Wallet).where(Wallet.id.in_(pw_ids))).rowcount or 0
+            )
+        # Shared wallets they created stay — just clear the creator link.
+        s.execute(
+            update(Wallet)
+            .where(Wallet.created_by_user_id == uid)
+            .values(created_by_user_id=None)
+        )
+
+        # 3) Budgets owned/created by the user.
+        summary["budgets"] = int(
+            s.execute(
+                delete(Budget).where(
+                    or_(Budget.owner_user_id == uid, Budget.created_by_user_id == uid)
+                )
+            ).rowcount
+            or 0
+        )
+
+        # 4) Their personal categories — detach from any other transactions first.
+        cat_ids = list(
+            s.scalars(select(Category.id).where(Category.owner_user_id == uid))
+        )
+        if cat_ids:
+            s.execute(
+                update(Transaction)
+                .where(Transaction.category_id.in_(cat_ids))
+                .values(category_id=None)
+            )
+            summary["categories"] = int(
+                s.execute(delete(Category).where(Category.id.in_(cat_ids))).rowcount
+                or 0
+            )
+
+        # 5) Invitations they sent; null them out where they were the target.
+        s.execute(delete(Invitation).where(Invitation.invited_by_user_id == uid))
+        s.execute(
+            update(Invitation)
+            .where(Invitation.target_user_id == uid)
+            .values(target_user_id=None)
+        )
+
+        # 6) Finally the user (admin_audit_log.actor_user_id is ON DELETE SET NULL).
+        s.execute(delete(User).where(User.id == uid))
+        s.commit()
+        return summary
+
+    def active_families(self) -> list[Family]:  # type: ignore[no-untyped-def]
+        return self._repo.list_families()
 
     def update_user(
         self,
@@ -264,6 +382,11 @@ class AdminService:
     def set_family_deleted(self, family, deleted: bool) -> None:  # type: ignore[no-untyped-def]
         family.is_deleted = deleted
         family.deleted_at = self.now() if deleted else None
+        self._session.commit()
+
+    def purge_family(self, family) -> None:  # type: ignore[no-untyped-def]
+        """Permanently delete the family + shared data; members are detached."""
+        self._repo.purge_family(family)
         self._session.commit()
 
     # --- wallets (edit / delete) --------------------------------------------

@@ -2,11 +2,14 @@
 {% block title %}Users{% endblock %}
 {% block heading %}Users{% endblock %}
 {% block content %}
+<div class="toolbar">
+  <a class="btn-primary" href="/admin/users/new">+ New user</a>
+</div>
 {% if users %}
 <table class="dt" data-per-page="15">
   <thead>
     <tr>
-      <th>Email</th><th>Name</th><th>Role</th><th>Admin</th>
+      <th>Email</th><th>Name</th><th>Phone</th><th>Role</th><th>Admin</th>
       <th>Family</th><th>Status</th><th>Created</th>
     </tr>
   </thead>
@@ -15,6 +18,7 @@
     <tr>
       <td><a href="/admin/users/{{ u.rid }}">{{ u.email }}</a></td>
       <td>{{ u.display_name }}</td>
+      <td>{{ u.phone or '—' }}</td>
       <td>{{ u.role }}</td>
       <td>{% if u.is_superadmin %}<span class="pill pill-warn">admin</span>{% else %}—{% endif %}</td>
       <td>{{ u.family_name or '—' }}</td>

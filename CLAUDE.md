@@ -182,7 +182,10 @@ requirements are both met:
   the family.
 - **Purge job** (`app/domains/account/maintenance.py`, Celery Beat, daily): once `deleted_at`
   is older than `RETENTION_DAYS` (30), a fully-deleted **family** is hard-purged with all its
-  data (transactions → wallets → invitations → members → family); a **member** soft-deleted
+  data — its members' **personal** rows too (their personal wallets/budgets/categories have
+  `family_id` NULL, so the job deletes by member id as well as family id), **budgets** included,
+  children before parents to satisfy Oracle FKs (SQLite doesn't enforce them, so test green ≠ safe);
+  a **member** soft-deleted
   inside a still-active family is **anonymised** (PII scrubbed) rather than deleted, because
   `transactions.created_by_user_id` is `NOT NULL` and references their row. The
   anonymised member's **personal** wallets (and their transactions) are purged
@@ -319,11 +322,14 @@ Dockerfile's `COPY app ./app`).
   `transfer_group_rid`); they can't be edited. Every mutation is `AdminService.log(...)`-audited;
   destructive forms use POST + CSRF + a confirm. Pages get a **breadcrumb** (`crumbs`) and one-shot
   **flash** messages (`flash` / `pop_flashes`, in the session).
-- **Scope so far:** login/logout; dashboard; **Users** (list → detail → edit; soft-delete / restore
-  / reset-password / unlink-Google); per-**wallet** transaction list with **transaction CRUD** +
-  wallet rename / delete; a global **/admin/transactions**; **Families** (detail → rename /
-  soft-delete / restore, member + wallet views, and **Categories** and **Budgets** CRUD with
-  per-row Edit pages); **Audit** log; and an Ops **Dependencies** panel.
+- **Scope so far:** login/logout; dashboard; **Users** (list with phone → **create** → detail →
+  edit; soft-delete / restore / reset-password / unlink-Google; **hard-delete** = `hard_delete_user`,
+  removes the user **and all related data** — every transaction they created, their personal
+  wallets, budgets and personal categories, invitations; shared wallets they created are kept with
+  the creator cleared); per-**wallet** transaction list with **transaction CRUD** + wallet rename /
+  delete; a global **/admin/transactions**; **Families** (detail → rename / soft-delete / restore /
+  **purge** [hard-delete shared data, members detached], member + wallet views, **Categories** and
+  **Budgets** CRUD with per-row Edit pages); **Audit** log; and an Ops **Dependencies** panel.
 - **Dependencies panel** (`/admin/dependencies`, `deps_panel.py`) reads **GitHub Dependabot alerts**
   for the configured repos (`GITHUB_REPOS`, default the backend + app) via a `GITHUB_TOKEN` secret —
   GitHub is the source of truth, we don't re-implement version diffing or a CVE DB. Results are

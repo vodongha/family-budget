@@ -32,6 +32,11 @@
       <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Unlink Google</button>
     </form>
   {% endif %}
+  <form method="post" action="/admin/users/{{ user.rid }}/purge" style="margin:0; margin-left:auto;"
+        onsubmit="return confirm('PERMANENTLY delete this user AND all their transactions, personal wallets, budgets and categories? This cannot be undone.');">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn btn-danger" type="submit">Delete permanently</button>
+  </form>
 </div>
 
 <form method="post" action="/admin/users/{{ user.rid }}/reset-password" class="toolbar"
