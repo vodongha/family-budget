@@ -483,12 +483,30 @@ rewrite history (`git filter-repo --replace-text`) and force-push — don't leav
 
 ## Git workflow
 
-- Default branch: `master`. History from the previous project (`htford`) is intentionally kept.
-- Branch for real work: `feature/short-description` or `bug/short-description` off `master`.
-- Open a PR into `master`; merge with a **merge commit** (no squash/rebase).
+Two long-lived branches (mirrors `vodongha-personal`):
+
+```
+feature/* ──┐
+bug/*    ──→  develop  →  PR → develop (merged)  →  PR → master  →  Fly.io auto-deploy
+                                                                          ↓
+hotfix/* ──────────────────────────────────────────────→  PR → master    ↓
+                                                                    develop ← auto-synced by sync-develop.yml
+```
+
+| Branch type | Base branch | PR target | When to use |
+|---|---|---|---|
+| `feature/short-description` | `develop` | `develop` | New feature |
+| `bug/short-description` | `develop` | `develop` | Non-urgent bug fix |
+| `hotfix/short-description` | `master` | `master` | Urgent production fix |
+
+- **`master` is production-only — never commit directly.** All feature/bug work goes through
+  `develop` first; merging `develop → master` triggers the Fly.io deploy. Hotfixes branch from
+  `master`, PR straight to `master`, and `develop` picks them up via auto-sync.
+- After every push to `master`, [`sync-develop.yml`](.github/workflows/sync-develop.yml) merges
+  `master` back into `develop`, so feature branches always start from the latest released code.
+- Open PRs; merge with a **merge commit** (no squash/rebase). History from the previous project
+  (`htford`) is intentionally kept.
 - Commit messages: short imperative subject, bullet body for meaningful changes; skip trivial noise.
-- There is no auto-deploy pipeline yet — direct pushes during early scaffolding are acceptable, but
-  prefer PRs once the app is in real use.
 
 ### Author identity & co-authorship
 
@@ -513,7 +531,8 @@ Production runs on **Fly.io**, region `sin` (Singapore — closest to ADB), doma
 
 - **CI/CD:** `.github/workflows/deploy.yml` deploys on push to `master` (ruff + pytest →
   `flyctl deploy --remote-only`, needs the `FLY_API_TOKEN` repo secret). `ci.yml` runs the same
-  checks on PRs only (no double run on push). Mirrors the `vodongha-personal` website setup.
+  checks on PRs to `master` and pushes to `develop`. `sync-develop.yml` merges `master → develop`
+  after each deploy. Mirrors the `vodongha-personal` website setup.
 - **`fly.toml`:** two process groups from one image — `app` (FastAPI, the only HTTP group;
   `auto_stop = suspend`, `min_machines_running = 0`) and `worker` (`celery worker --beat`, runs
   continuously so the scheduled jobs fire). `[deploy] release_command = "alembic upgrade head"`
