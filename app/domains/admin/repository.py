@@ -7,7 +7,7 @@ boundary; they must only ever be reached behind ``require_admin``.
 
 from datetime import date, datetime
 
-from sqlalchemy import and_, false, func, or_, select, true, update
+from sqlalchemy import and_, false, func, or_, select, true
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.domains.admin.models import AdminAuditLog
@@ -263,22 +263,6 @@ class AdminRepository:
             ).all()
         )
         return rows, total
-
-    # --- hard delete (cross-tenant; caller commits) --------------------------
-
-    def purge_family(self, family: Family) -> None:
-        """Permanently remove a family and its **shared** data, detaching members
-        (their accounts + personal data are kept). Reuses the domain purge so the
-        FK order stays in one place."""
-        from app.domains.families.repository import FamilyRepository
-
-        # Detach members first (users.family_id FKs the family we're deleting).
-        self._session.execute(
-            update(User)
-            .where(User.family_id == family.id)
-            .values(family_id=None, role=UserRole.MEMBER.value)
-        )
-        FamilyRepository(self._session).purge_family(family.id)
 
     # --- audit log -----------------------------------------------------------
 

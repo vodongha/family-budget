@@ -267,7 +267,15 @@
     sel.addEventListener('change', function () { perPage = parseInt(sel.value, 10); state.page = 1; render(); });
 
     function txt(r, i) { return (r.cells[i] ? r.cells[i].innerText : '').trim(); }
-    function asNum(v) { var n = parseFloat(v.replace(/[^0-9.\-]/g, '')); return isNaN(n) ? null : n; }
+    function asNum(v) {
+      // Date/time cells (e.g. "2026-06-19 04:27") contain digit-separator-digit
+      // patterns; parsing them as numbers mangles the value (all collapse to the
+      // year), so fall back to text sort — ISO-formatted dates sort chronologically
+      // as strings anyway.
+      if (/\d[-/:]\d/.test(v)) return null;
+      var n = parseFloat(v.replace(/[^0-9.\-]/g, ''));
+      return isNaN(n) ? null : n;
+    }
 
     function render() {
       var data = rows;

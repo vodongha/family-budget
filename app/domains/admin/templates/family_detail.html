@@ -27,11 +27,6 @@
       <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-danger" type="submit">Soft-delete family</button>
     </form>
   {% endif %}
-  <form method="post" action="/admin/families/{{ family.rid }}/purge" style="margin:0; margin-left:auto;"
-        onsubmit="return confirm('PERMANENTLY delete this family and ALL its shared wallets, transactions, categories and budgets? Members are detached (their accounts kept). This cannot be undone.');">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button class="btn btn-danger" type="submit">Delete permanently</button>
-  </form>
 </div>
 
 <section>

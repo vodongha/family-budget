@@ -323,13 +323,14 @@ Dockerfile's `COPY app ./app`).
   destructive forms use POST + CSRF + a confirm. Pages get a **breadcrumb** (`crumbs`) and one-shot
   **flash** messages (`flash` / `pop_flashes`, in the session).
 - **Scope so far:** login/logout; dashboard; **Users** (list with phone → **create** → detail →
-  edit; soft-delete / restore / reset-password / unlink-Google; **hard-delete** = `hard_delete_user`,
-  removes the user **and all related data** — every transaction they created, their personal
-  wallets, budgets and personal categories, invitations; shared wallets they created are kept with
-  the creator cleared); per-**wallet** transaction list with **transaction CRUD** + wallet rename /
-  delete; a global **/admin/transactions**; **Families** (detail → rename / soft-delete / restore /
-  **purge** [hard-delete shared data, members detached], member + wallet views, **Categories** and
-  **Budgets** CRUD with per-row Edit pages); **Audit** log; and an Ops **Dependencies** panel.
+  edit; reset-password / unlink-Google; **delete is soft-only** — sets `is_deleted`, never removes
+  real data; restore); per-**wallet** transaction list with **transaction CRUD** + wallet rename /
+  delete; a global **/admin/transactions**; **Families** (detail → rename / **soft-delete** /
+  restore, member + wallet views, **Categories** and **Budgets** CRUD with per-row Edit pages);
+  **Audit** log; and an Ops **Dependencies** panel. **Admin deletion of users/families only flags
+  them** (data is kept; the only thing that ever physically purges accounts is the scheduled 30-day
+  retention job, required by the store policy). Wallets/transactions/categories/budgets have no
+  soft-delete flag, so their admin delete is a real delete (with a confirm).
 - **Dependencies panel** (`/admin/dependencies`, `deps_panel.py`) reads **GitHub Dependabot alerts**
   for the configured repos (`GITHUB_REPOS`, default the backend + app) via a `GITHUB_TOKEN` secret —
   GitHub is the source of truth, we don't re-implement version diffing or a CVE DB. Results are
@@ -515,8 +516,17 @@ Production runs on **Fly.io**, region `sin` (Singapore — closest to ADB), doma
   checks on PRs only (no double run on push). Mirrors the `vodongha-personal` website setup.
 - **`fly.toml`:** two process groups from one image — `app` (FastAPI, the only HTTP group;
   `auto_stop = suspend`, `min_machines_running = 0`) and `worker` (`celery worker --beat`, runs
-  continuously so the daily purge fires). `[deploy] release_command = "alembic upgrade head"`
-  migrates before each release. VM 512MB each.
+  continuously so the scheduled jobs fire). `[deploy] release_command = "alembic upgrade head"`
+  migrates before each release. VM 512MB each. The beat schedule (`app/core/celery_app.py`) uses
+  **crontab** clock times (rates refresh 00:00 + 12:00 ICT, account purge 03:00 ICT) — not relative
+  intervals, which reset their countdown on every worker restart (each deploy), so frequent deploys
+  would otherwise keep postponing the run.
+  - ⚠️ **The worker machine must actually be running** for any schedule to fire. It was once a
+    **stopped Fly "standby" machine** (a failover spare), so beat never ran — rates only updated
+    on manual `POST /rates/refresh`. Fix: `fly machine update <worker-id> --standby-for= --yes` to
+    clear the standby, leaving a normal always-on worker. Check with `fly status -a famo` (the
+    worker row must say `started`, no `†` standby marker) and `fly logs --machine <worker-id>`
+    (look for `beat: Starting`).
 - **Wallet on Fly:** never committed/baked. `scripts/fly_entrypoint.sh` decodes base64 secrets
   (`WALLET_EWALLET_PEM_B64`, `WALLET_TNSNAMES_B64`, `WALLET_SQLNET_B64`) into `WALLET_DIR` at
   startup; the entrypoint runs for **every** process group so all machines get the wallet. Skipped
