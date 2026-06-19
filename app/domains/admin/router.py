@@ -175,6 +175,68 @@ def audit_page(request: Request, session: SessionDep, admin: CurrentAdmin) -> HT
     )
 
 
+# --- create user -----------------------------------------------------------
+
+
+@router.get("/users/new", response_class=HTMLResponse)
+def user_new_form(
+    request: Request, session: SessionDep, admin: CurrentAdmin
+) -> HTMLResponse:
+    svc = AdminService(session)
+    return templates.TemplateResponse(
+        request,
+        "user_new.html",
+        _ctx(
+            request,
+            admin,
+            "users",
+            crumbs=[{"label": "Users", "href": "/admin/users"}, {"label": "New user"}],
+            roles=[r.value for r in UserRole],
+            families=svc.active_families(),
+        ),
+    )
+
+
+@router.post("/users")
+def user_create(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    email: Annotated[str, Form()] = "",
+    password: Annotated[str, Form()] = "",
+    display_name: Annotated[str, Form()] = "",
+    phone: Annotated[str, Form()] = "",
+    role: Annotated[str, Form()] = UserRole.MEMBER.value,
+    is_superadmin: Annotated[bool, Form()] = False,
+    family_rid: Annotated[str, Form()] = "",
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    if not _check_csrf(request, csrf):
+        return RedirectResponse("/admin/users/new", status_code=_REDIRECT)
+    if not email.strip() or not display_name.strip() or len(password) < 8:
+        flash(request, "Email, name, and a password (≥8 chars) are required.", "error")
+        return RedirectResponse("/admin/users/new", status_code=_REDIRECT)
+    family = svc.get_family(family_rid) if family_rid else None
+    try:
+        user = svc.create_user(
+            email=email,
+            password=password,
+            display_name=display_name,
+            phone=phone,
+            role=role,
+            is_superadmin=is_superadmin,
+            family_id=family.id if family else None,
+        )
+    except Exception:  # noqa: BLE001 — surface duplicate email/phone to the admin
+        session.rollback()
+        flash(request, "Could not create (email or phone already in use?).", "error")
+        return RedirectResponse("/admin/users/new", status_code=_REDIRECT)
+    svc.log(admin, "user.create", target_type="user", target_rid=user.rid)
+    flash(request, "User created.")
+    return RedirectResponse(f"/admin/users/{user.rid}", status_code=_REDIRECT)
+
+
 # --- user detail + actions -------------------------------------------------
 
 
@@ -323,6 +385,32 @@ def user_restore(
     svc.log(admin, "user.restore", target_type="user", target_rid=user.rid)
     flash(request, "User restored.")
     return RedirectResponse(f"/admin/users/{rid}", status_code=_REDIRECT)
+
+
+@router.post("/users/{rid}/purge")
+def user_purge(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    res = _user_action(request, session, admin, rid, csrf)
+    if isinstance(res, RedirectResponse):
+        return res
+    svc, user = res
+    if user.id == admin.id:
+        flash(request, "You can't permanently delete your own account.", "error")
+        return RedirectResponse(f"/admin/users/{rid}", status_code=_REDIRECT)
+    summary = svc.hard_delete_user(user)
+    svc.log(admin, "user.hard_delete", target_type="user", target_rid=rid, detail=str(summary))
+    flash(
+        request,
+        "User permanently deleted "
+        f"({summary['transactions']} transactions, {summary['wallets']} wallets removed).",
+        "warn",
+    )
+    return RedirectResponse("/admin/users", status_code=_REDIRECT)
 
 
 @router.post("/users/{rid}/reset-password")
@@ -700,6 +788,25 @@ def family_delete(
     svc.log(admin, "family.soft_delete", target_type="family", target_rid=family.rid)
     flash(request, "Family soft-deleted.", "warn")
     return RedirectResponse(f"/admin/families/{rid}", status_code=_REDIRECT)
+
+
+@router.post("/families/{rid}/purge")
+def family_purge(
+    request: Request,
+    session: SessionDep,
+    admin: CurrentAdmin,
+    rid: str,
+    csrf: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    svc = AdminService(session)
+    family = _load_family(request, svc, rid, csrf)
+    if isinstance(family, RedirectResponse):
+        return family
+    name = family.name
+    svc.purge_family(family)
+    svc.log(admin, "family.purge", target_type="family", target_rid=rid, detail=name)
+    flash(request, f"Family '{name}' permanently deleted; members detached.", "warn")
+    return RedirectResponse("/admin/families", status_code=_REDIRECT)
 
 
 @router.post("/families/{rid}/restore")

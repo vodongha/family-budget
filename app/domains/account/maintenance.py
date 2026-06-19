@@ -16,9 +16,10 @@ SQLite; ``purge_expired_accounts_task`` is the Celery Beat entry point.
 
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, select, true
+from sqlalchemy import delete, or_, select, true
 from sqlalchemy.orm import Session
 
+from app.domains.budgets.models import Budget
 from app.domains.categories.models import Category
 from app.domains.invitations.models import Invitation
 from app.domains.transactions.models import Transaction
@@ -52,10 +53,63 @@ def purge_expired_accounts(
         )
     )
     for family_id in family_ids:
-        session.execute(delete(Transaction).where(Transaction.family_id == family_id))
-        session.execute(delete(Category).where(Category.family_id == family_id))
-        session.execute(delete(Wallet).where(Wallet.family_id == family_id))
-        session.execute(delete(Invitation).where(Invitation.family_id == family_id))
+        # The members are all being removed, so delete their **personal** data
+        # (family_id NULL) too, not just the family's shared rows — otherwise the
+        # personal wallets/budgets/categories still reference the user rows and
+        # Oracle rejects the `delete users` (ORA-02292). Children before parents.
+        member_ids = list(
+            session.scalars(select(User.id).where(User.family_id == family_id))
+        )
+        wallet_ids = list(
+            session.scalars(
+                select(Wallet.id).where(
+                    or_(
+                        Wallet.family_id == family_id,
+                        Wallet.owner_user_id.in_(member_ids),
+                    )
+                )
+            )
+        )
+        # Transactions in those wallets + anything the members created elsewhere.
+        if wallet_ids:
+            session.execute(
+                delete(Transaction).where(Transaction.wallet_id.in_(wallet_ids))
+            )
+        if member_ids:
+            session.execute(
+                delete(Transaction).where(
+                    Transaction.created_by_user_id.in_(member_ids)
+                )
+            )
+        # Budgets reference families + categories + users — before those parents.
+        session.execute(
+            delete(Budget).where(
+                or_(
+                    Budget.family_id == family_id,
+                    Budget.owner_user_id.in_(member_ids),
+                    Budget.created_by_user_id.in_(member_ids),
+                )
+            )
+        )
+        session.execute(
+            delete(Category).where(
+                or_(
+                    Category.family_id == family_id,
+                    Category.owner_user_id.in_(member_ids),
+                )
+            )
+        )
+        if wallet_ids:
+            session.execute(delete(Wallet).where(Wallet.id.in_(wallet_ids)))
+        session.execute(
+            delete(Invitation).where(
+                or_(
+                    Invitation.family_id == family_id,
+                    Invitation.invited_by_user_id.in_(member_ids),
+                    Invitation.target_user_id.in_(member_ids),
+                )
+            )
+        )
         session.execute(delete(User).where(User.family_id == family_id))
         session.execute(delete(Family).where(Family.id == family_id))
         summary["families_purged"] += 1
@@ -90,6 +144,8 @@ def purge_expired_accounts(
         user.email = f"deleted+{user.rid}@deleted.invalid"
         user.display_name = "Deleted user"
         user.hashed_password = ""
+        # Drop any platform-admin access from a scrubbed account.
+        user.is_superadmin = False
         summary["members_anonymised"] += 1
 
     session.commit()

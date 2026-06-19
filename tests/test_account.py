@@ -144,6 +144,28 @@ def test_purge_removes_expired_family_and_all_data(
     assert db_session.scalar(select(func.count()).select_from(Transaction)) == 0
 
 
+def test_purge_removes_expired_family_budgets(
+    client: TestClient, auth_headers: dict[str, str], db_session: Session
+) -> None:
+    # Regression: the family-purge step must also delete budgets (they FK
+    # families + categories + users; Oracle rejects the parent deletes otherwise).
+    from app.domains.budgets.models import Budget
+
+    cats = client.get("/categories", headers=auth_headers).json()
+    expense = next(c for c in cats if c["kind"] == "expense")
+    client.post(
+        "/budgets",
+        json={"category_rid": expense["rid"], "amount": 100000},
+        headers=auth_headers,
+    )
+    client.delete("/auth/me", headers=auth_headers)
+    _age_deletion(db_session, "dad@example.com", days=31)
+
+    summary = purge_expired_accounts(db_session)
+    assert summary["families_purged"] == 1
+    assert db_session.scalar(select(func.count()).select_from(Budget)) == 0
+
+
 def test_purge_anonymises_expired_member_but_keeps_row(
     client: TestClient, auth_headers: dict[str, str], db_session: Session
 ) -> None:

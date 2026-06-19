@@ -66,10 +66,11 @@ income/expense together, scoped per family.
 - **Admin panel** — a server-rendered, super-admin-only console at `/admin` (session cookie,
   separate from the API JWT and the web app). Responsive (collapsible grouped icon sidebar →
   drawer on mobile); tables are datatables (sort + search + pagination). Dashboard, **user
-  management** (edit / soft-delete / restore / reset password / unlink Google) and **transaction
+  management** (create / edit / soft-delete / restore / **permanent delete** with all related
+  data / reset password / unlink Google) and **transaction
   CRUD** per wallet + a global transactions view, **family management**
-  (rename / soft-delete / restore, members + wallets, and category & budget CRUD), and wallet
-  rename/delete, and an Ops **Dependencies** panel (GitHub Dependabot alerts for both repos). Admin transaction writes reuse the app's
+  (rename / soft-delete / restore / **purge**, members + wallets, and category & budget CRUD), and
+  wallet rename/delete, and an Ops **Dependencies** panel (GitHub Dependabot alerts for both repos). Admin transaction writes reuse the app's
   money logic (integer minor units, derived balances); transfers are delete-only. Admins are
   bootstrapped with `python -m app.scripts.create_admin` — never via the public API
 - **Health** — `GET /health` runs `SELECT 1 FROM dual` to verify the ADB connection

@@ -1,0 +1,29 @@
+{% extends "shell.html" %}
+{% block title %}New user{% endblock %}
+{% block heading %}New user{% endblock %}
+{% block content %}
+<form class="form" method="post" action="/admin/users">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="field"><label>Display name</label><input name="display_name" required></div>
+  <div class="field"><label>Email</label><input name="email" type="email" required></div>
+  <div class="field"><label>Password</label><input name="password" type="text" minlength="8" placeholder="≥ 8 chars" required></div>
+  <div class="field"><label>Phone</label><input name="phone" placeholder="+84… (optional)"></div>
+  <div class="form-row">
+    <div class="field"><label>Role</label>
+      <select name="role">{% for r in roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Family</label>
+      <select name="family_rid">
+        <option value="">— none (personal) —</option>
+        {% for f in families %}<option value="{{ f.rid }}">{{ f.name }}{{ ' (deleted)' if f.is_deleted else '' }}</option>{% endfor %}
+      </select></div>
+  </div>
+  <div class="field check">
+    <input type="checkbox" name="is_superadmin" id="sa" value="true">
+    <label for="sa" style="margin:0;">Platform super-admin (can access /admin)</label>
+  </div>
+  <div class="actions">
+    <button class="btn-primary" type="submit">Create</button>
+    <a class="btn" href="/admin/users">Cancel</a>
+  </div>
+</form>
+{% endblock %}

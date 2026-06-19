@@ -1,8 +1,10 @@
 """Admin panel: session auth gate, login flow, and dashboard metrics."""
 
 import re
+from datetime import date
 
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
@@ -353,6 +355,81 @@ def test_category_and_budget_edit_forms(client: TestClient, db_session: Session)
     page = client.get(f"/admin/families/{fam.rid}").text
     bud_rid = re.search(r"/admin/budgets/([0-9A-Z]+)/edit", page).group(1)
     assert client.get(f"/admin/budgets/{bud_rid}/edit").status_code == 200
+
+
+def test_create_user(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    _login(client)
+    assert client.get("/admin/users/new").status_code == 200
+    csrf = _csrf_from(client, "/admin/users/new")
+    res = client.post(
+        "/admin/users",
+        data={
+            "email": "fresh@example.com",
+            "password": "new-pass-123",
+            "display_name": "Fresh",
+            "csrf": csrf,
+        },
+        follow_redirects=False,
+    )
+    assert res.status_code == 303
+    assert "fresh@example.com" in client.get("/admin/users").text
+
+
+def test_hard_delete_user_cascades(client: TestClient, db_session: Session) -> None:
+    from app.domains.transactions.models import Transaction, TransactionType
+
+    _make_admin(db_session)
+    owner = _make_user(db_session)
+    wallet = _make_wallet(db_session, owner)
+    db_session.add(
+        Transaction(
+            rid=new_rid(),
+            wallet_id=wallet.id,
+            created_by_user_id=owner.id,
+            type=TransactionType.INCOME.value,
+            amount=50000,
+            note=None,
+            occurred_on=date(2026, 6, 18),
+        )
+    )
+    db_session.commit()
+    _login(client)
+    csrf = _csrf_from(client, f"/admin/users/{owner.rid}")
+    res = client.post(
+        f"/admin/users/{owner.rid}/purge", data={"csrf": csrf}, follow_redirects=False
+    )
+    assert res.status_code == 303
+    assert db_session.scalar(select(User).where(User.id == owner.id)) is None
+    assert (
+        db_session.scalar(select(Wallet).where(Wallet.id == wallet.id)) is None
+    )
+    assert (
+        db_session.scalar(
+            select(func.count()).select_from(Transaction).where(
+                Transaction.created_by_user_id == owner.id
+            )
+        )
+        == 0
+    )
+
+
+def test_family_purge_detaches_members(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    fam = _make_family(db_session)
+    member = _make_user(db_session, email="member@example.com")
+    member.family_id = fam.id
+    db_session.commit()
+    _login(client)
+    csrf = _csrf_from(client, f"/admin/families/{fam.rid}")
+    res = client.post(
+        f"/admin/families/{fam.rid}/purge", data={"csrf": csrf}, follow_redirects=False
+    )
+    assert res.status_code == 303
+    assert db_session.scalar(select(Family).where(Family.id == fam.id)) is None
+    # Member account survives, detached from the family.
+    db_session.refresh(member)
+    assert member.family_id is None
 
 
 def test_wallet_rename_and_delete(client: TestClient, db_session: Session) -> None:
