@@ -3,12 +3,13 @@ name: Dependabot auto-merge
 # Auto-merge Dependabot PRs once CI is green. This is keyed off the CI
 # workflow *completing successfully* (workflow_run), so a PR is only ever
 # merged after ruff + pytest have passed — never before. It runs in the
-# trusted base-repo context, so it can merge with the default GITHUB_TOKEN
-# without needing branch protection or the "Allow auto-merge" repo setting.
+# trusted base-repo context.
 #
-# After the merge lands on master, the separate Deploy workflow runs
-# (lint -> test -> deploy to Fly.io), so the deploy still happens last,
-# only once everything passes.
+# The merge uses GH_PAT, not the default GITHUB_TOKEN: a push made with
+# GITHUB_TOKEN does NOT trigger further workflows, which would skip the Deploy
+# and Sync-develop workflows. With a PAT the merge to master fires Deploy
+# (lint -> test -> deploy to Fly.io) last, only once everything passes, and
+# sync-develop merges master back into develop.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -31,6 +32,7 @@ jobs:
       - name: Merge the green Dependabot PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MERGE_TOKEN: ${{ secrets.GH_PAT }}
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
@@ -41,4 +43,4 @@ jobs:
             exit 0
           fi
           echo "CI passed for $BRANCH — merging PR #$number."
-          gh pr merge "$number" --repo "$REPO" --merge --delete-branch
+          GH_TOKEN="$MERGE_TOKEN" gh pr merge "$number" --repo "$REPO" --merge --delete-branch
