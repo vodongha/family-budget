@@ -1,0 +1,44 @@
+name: Dependabot auto-merge
+
+# Auto-merge Dependabot PRs once CI is green. This is keyed off the CI
+# workflow *completing successfully* (workflow_run), so a PR is only ever
+# merged after ruff + pytest have passed — never before. It runs in the
+# trusted base-repo context, so it can merge with the default GITHUB_TOKEN
+# without needing branch protection or the "Allow auto-merge" repo setting.
+#
+# After the merge lands on master, the separate Deploy workflow runs
+# (lint -> test -> deploy to Fly.io), so the deploy still happens last,
+# only once everything passes.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    # Only act when CI passed on a Dependabot pull request.
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]' &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/')
+    steps:
+      - name: Merge the green Dependabot PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          number=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open \
+            --json number --jq '.[0].number')
+          if [ -z "$number" ]; then
+            echo "No open PR for $BRANCH — nothing to merge."
+            exit 0
+          fi
+          echo "CI passed for $BRANCH — merging PR #$number."
+          gh pr merge "$number" --repo "$REPO" --merge --delete-branch
