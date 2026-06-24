@@ -3,6 +3,9 @@ updates:
   # Python deps (pyproject.toml) — weekly PRs grouped to keep the noise down.
   - package-ecosystem: "pip"
     directory: "/"
+    # Target develop, not the default branch — master is release-only, so deps
+    # flow through develop and reach master via the normal release PR.
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -12,6 +15,7 @@ updates:
   # Keep the GitHub Actions used by CI/CD up to date too.
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
