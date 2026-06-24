@@ -1,0 +1,43 @@
+// Theme tokens. The SCSS variables are the single source of truth; the :root
+// block below re-exports them as CSS custom properties so the runtime-toggled
+// states (body.sb-collapsed / body.sb-open) and the rgba() tints all share the
+// same values. Breakpoints stay SCSS-only — custom properties can't be used in
+// @media conditions.
+
+// Palette
+$bg:        #0d1117;
+$surface:   #161b22;
+$surface-2: #1c2128;
+$border:    #30363d;
+$text:      #e6edf3;
+$muted:     #8b949e;
+$primary:   #6e7bf2;
+$accent:    #2f81f7;
+$danger:    #f85149;
+$warn:      #d29922;
+$ok:        #3fb950;
+
+// Metrics
+$radius:    10px;
+$sidebar-w: 240px;
+$rail-w:    64px;
+
+// The mobile drawer kicks in at/below this width.
+$bp-mobile: 860px;
+
+:root {
+  --bg: #{$bg};
+  --surface: #{$surface};
+  --surface-2: #{$surface-2};
+  --border: #{$border};
+  --text: #{$text};
+  --muted: #{$muted};
+  --primary: #{$primary};
+  --accent: #{$accent};
+  --danger: #{$danger};
+  --warn: #{$warn};
+  --ok: #{$ok};
+  --radius: #{$radius};
+  --sidebar-w: #{$sidebar-w};
+  --rail-w: #{$rail-w};
+}

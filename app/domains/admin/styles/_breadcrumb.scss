@@ -1,0 +1,14 @@
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 10px;
+
+  a { color: var(--muted); }
+  a:hover { color: var(--text); }
+  .sep { opacity: .5; }
+  .cur { color: var(--text); }
+}

@@ -4,12 +4,15 @@ Mounted under ``/admin``. Registered before the SPA static mount in
 ``app.main`` so these paths win over the Flutter web app served at ``/``.
 """
 
+import hashlib
 from datetime import date
 from pathlib import Path
 from typing import Annotated, Any
 
+import sass
 from fastapi import APIRouter, FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.status import HTTP_303_SEE_OTHER
@@ -38,6 +41,25 @@ from app.domains.users.models import User, UserRole
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 templates.env.filters["money"] = to_major
+
+# SCSS source + the directory the compiled stylesheet is served from.
+_STYLES_DIR = Path(__file__).resolve().parent / "styles"
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+def _build_admin_css() -> str:
+    """Compile ``styles/admin.scss`` → ``static/admin.css`` and return a short
+    content hash used to cache-bust the ``<link>`` in base.html.
+
+    Run once at startup (see :func:`setup_admin`). The compiled CSS is a build
+    artifact — it's git-ignored and regenerated on every boot, so the SCSS
+    partials stay the single source of truth.
+    """
+    css = sass.compile(filename=str(_STYLES_DIR / "admin.scss"), output_style="compressed")
+    _STATIC_DIR.mkdir(exist_ok=True)
+    (_STATIC_DIR / "admin.css").write_text(css, encoding="utf-8")
+    return hashlib.sha256(css.encode("utf-8")).hexdigest()[:8]
+
 
 router = APIRouter(prefix="/admin", tags=["admin"], include_in_schema=False)
 
@@ -1073,5 +1095,12 @@ def setup_admin(app: FastAPI) -> None:
         request: Request, exc: AdminLoginRequired
     ) -> RedirectResponse:
         return RedirectResponse(LOGIN_PATH, status_code=_REDIRECT)
+
+    # Compile the SCSS, expose its cache-busting URL to templates, and serve the
+    # compiled file. Mounted before the SPA catch-all at "/" (this runs first in
+    # app.main), so /admin/static/* resolves here.
+    version = _build_admin_css()
+    templates.env.globals["admin_css_url"] = f"/admin/static/admin.css?v={version}"
+    app.mount("/admin/static", StaticFiles(directory=str(_STATIC_DIR)), name="admin-static")
 
     app.include_router(router)

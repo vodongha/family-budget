@@ -6,9 +6,11 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
-    # Admin panel: server-rendered templates + signed session cookies.
+    # Admin panel: server-rendered templates + signed session cookies, with the
+    # stylesheet compiled from SCSS (styles/*.scss → static/admin.css) at startup.
     "jinja2>=3.1",
     "itsdangerous>=2.2",
+    "libsass>=0.23",
     "sqlalchemy>=2.0.36",
     "oracledb>=2.5",
     "alembic>=1.14",

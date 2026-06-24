@@ -1,0 +1,17 @@
+// Admin panel stylesheet (source of truth).
+//
+// Compiled to ../static/admin.css at app startup by app/domains/admin/router.py
+// and served at /admin/static/admin.css. Edit these partials — never the
+// generated CSS. Import order below mirrors the original cascade.
+
+@import "variables";
+@import "base";
+@import "layout";
+@import "sidebar";
+@import "topbar";
+@import "cards";
+@import "tables";
+@import "breadcrumb";
+@import "flash";
+@import "forms";
+@import "responsive";
