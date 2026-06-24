@@ -283,7 +283,11 @@ A **server-rendered** (Jinja2 + signed-cookie session), super-admin-only console
 separate from the JWT-authenticated API and from the Flutter SPA. `setup_admin(app)` in
 `router.py` is called from `main.py` **before** the `StaticFiles` mount at `/`, so `/admin*` wins
 over the SPA catch-all. Templates live in `app/domains/admin/templates/` (shipped via the
-Dockerfile's `COPY app ./app`).
+Dockerfile's `COPY app ./app`). **Styles are authored as SCSS partials** in
+`app/domains/admin/styles/` (`admin.scss` + `_variables/_layout/_tables/…`) and compiled with
+**libsass** to `static/admin.css` **once at startup** by `setup_admin`, which mounts it at
+`/admin/static/` and exposes a cache-busting `admin_css_url` (hash query) to the templates. The
+compiled CSS is a **git-ignored build artifact** — edit the SCSS, never the generated file.
 
 - **Super-admin identity** is a new `users.is_superadmin` flag (migration `c1d2e3f4a5b6`),
   **independent of** the family-scoped `owner`/`member` role. An admin is a normal `users` row
@@ -302,7 +306,7 @@ Dockerfile's `COPY app ./app`).
   must stay behind `require_admin`.
 - **Audit log** — `admin_audit_log` (model in `admin/models.py`) records every admin mutation
   (actor, action, target, JSON detail). Call `AdminService.log(...)` after a successful mutation.
-- **UI conventions (baked into `base.html` / `shell.html`, apply to every page):** responsive.
+- **UI conventions (structure in `base.html` / `shell.html`, styling in `styles/*.scss`, apply to every page):** responsive.
   The sidebar collapse toggle lives **inside the sidebar**; on desktop it collapses to an **icon
   rail** (icons only, state persisted in `localStorage`), and on mobile (≤860px) the sidebar is an
   **off-canvas drawer** opened by a topbar hamburger. The nav is **grouped with inline-SVG icons**

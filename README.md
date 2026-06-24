@@ -65,7 +65,8 @@ income/expense together, scoped per family.
   Google Play store-listing URL; also embedded in-app via a WebView)
 - **Admin panel** — a server-rendered, super-admin-only console at `/admin` (session cookie,
   separate from the API JWT and the web app). Responsive (collapsible grouped icon sidebar →
-  drawer on mobile); tables are datatables (sort + search + pagination). Dashboard, **user
+  drawer on mobile); tables are datatables (sort + search + pagination). Styling is authored in
+  **SCSS** (`app/domains/admin/styles/`), compiled to CSS at startup. Dashboard, **user
   management** (create / edit / **soft-delete** [flag only, data kept] / restore / reset password /
   unlink Google) and **transaction
   CRUD** per wallet + a global transactions view, **family management**

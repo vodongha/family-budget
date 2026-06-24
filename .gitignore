@@ -31,3 +31,6 @@ ojdbc.properties
 *.sqlite
 *.db
 .DS_Store
+
+# Admin panel CSS — compiled from styles/*.scss at startup (build artifact)
+app/domains/admin/static/admin.css
