@@ -1,0 +1,45 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+
+  h1 { font-size: 20px; margin: 0; flex: 1; min-width: 0; }
+}
+
+.icon-btn {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+
+  &:hover { border-color: var(--muted); }
+  svg { width: 16px; height: 16px; transition: transform .2s; }
+}
+
+.who { color: var(--muted); font-size: 13px; }
+
+.btn {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+
+  &:hover { border-color: var(--muted); }
+  &:disabled { opacity: .4; cursor: default; }
+}
+
+.btn-danger { color: var(--danger); border-color: var(--danger); }
+
+.sb-burger { display: none; }

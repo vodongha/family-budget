@@ -1,0 +1,47 @@
+/* ---- desktop vs mobile toggle visibility ---- */
+@media (min-width: $bp-mobile + 1) {
+  .sb-burger { display: none !important; }
+}
+
+@media (max-width: $bp-mobile) {
+  .sb-rail { display: none !important; }
+  .sb-burger { display: inline-flex; }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 50;
+    width: var(--sidebar-w);
+    flex-basis: var(--sidebar-w);
+    transform: translateX(-100%);
+    box-shadow: 2px 0 16px rgba(0, 0, 0, .4);
+  }
+
+  body.sb-open .sidebar { transform: translateX(0); }
+
+  /* On mobile the drawer always shows full labels, ignoring desktop rail. */
+  body.sb-collapsed {
+    .sidebar { width: var(--sidebar-w); flex-basis: var(--sidebar-w); }
+    .brand .full { display: inline; }
+    .brand .mark { display: none; }
+    .grp-label { display: flex; }
+    .nav a { justify-content: flex-start; padding: 9px 10px; }
+    .nav a span { display: inline; }
+  }
+
+  .sb-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .55);
+    z-index: 40;
+  }
+
+  body.sb-open .sb-backdrop { display: block; }
+
+  .main { padding: 16px 16px 56px; }
+  .dt-search { min-width: 0; flex: 1; }
+}
+
+.sb-backdrop { display: none; }

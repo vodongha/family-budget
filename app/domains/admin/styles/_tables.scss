@@ -1,0 +1,95 @@
+.dt-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.dt-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dt-size {
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+}
+
+.dt-search {
+  padding: 7px 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  min-width: 200px;
+}
+
+.dt-scroll { overflow-x: auto; border-radius: var(--radius); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+th { color: var(--muted); font-weight: 600; background: var(--surface-2); }
+
+tr:last-child td { border-bottom: none; }
+
+.dt-sortable {
+  cursor: pointer;
+  user-select: none;
+
+  &::after { content: '\21C5'; opacity: .35; margin-left: 6px; font-size: 11px; } // ⇅
+}
+
+th.dt-asc::after { content: '\2191'; opacity: .9; }  // ↑
+th.dt-desc::after { content: '\2193'; opacity: .9; } // ↓
+
+.dt-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dt-nav { display: flex; align-items: center; gap: 8px; }
+.dt-page { min-width: 52px; text-align: center; }
+
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.pill-ok { background: rgba($ok, .15); color: var(--ok); }
+.pill-warn { background: rgba($warn, .15); color: var(--warn); }
+
+.empty { color: var(--muted); padding: 14px; }
+
+code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }
