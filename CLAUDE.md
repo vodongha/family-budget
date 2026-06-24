@@ -19,8 +19,8 @@ The architecture deliberately mirrors a layered service design (the author's day
 - **Wiki:** https://github.com/vodongha/family-budget/wiki (Architecture, Connection & Wallet,
   Database & Migrations, API Reference, Testing, Git Workflow). Update the relevant wiki page when
   behaviour it documents changes.
-- **CI:** `.github/workflows/ci.yml` runs `ruff check` + `pytest` (SQLite, no ADB) on pushes/PRs to
-  `master`. Keep it green.
+- **CI:** `.github/workflows/ci.yml` runs `ruff check` + `pytest` (SQLite, no ADB) on pushes to
+  `develop` and PRs into `develop` or `master`. Keep it green.
 
 ## Technology stack
 
@@ -340,7 +340,9 @@ compiled CSS is a **git-ignored build artifact** — edit the SCSS, never the ge
   GitHub is the source of truth, we don't re-implement version diffing or a CVE DB. Results are
   cached per repo (1h; `?refresh=1` bypasses) and shown as datatables (package / ecosystem /
   severity / vulnerable range / patched version). No token → a setup hint. A `.github/dependabot.yml`
-  also opens weekly version-update PRs for pip + actions.
+  also opens weekly version-update PRs for pip + actions, **targeting `develop`** (not the default
+  branch); `dependabot-auto-merge.yml` merges them once CI is green, so they reach `master` via the
+  normal release PR.
 
 ### Privacy policy (`app/domains/legal/`)
 
@@ -535,7 +537,7 @@ Production runs on **Fly.io**, region `sin` (Singapore — closest to ADB), doma
 
 - **CI/CD:** `.github/workflows/deploy.yml` deploys on push to `master` (ruff + pytest →
   `flyctl deploy --remote-only`, needs the `FLY_API_TOKEN` repo secret). `ci.yml` runs the same
-  checks on PRs to `master` and pushes to `develop`. `sync-develop.yml` merges `master → develop`
+  checks on pushes to `develop` and PRs into `develop`/`master`. `sync-develop.yml` merges `master → develop`
   after each deploy. Mirrors the `vodongha-personal` website setup.
 - **`fly.toml`:** two process groups from one image — `app` (FastAPI, the only HTTP group;
   `auto_stop = suspend`, `min_machines_running = 0`) and `worker` (`celery worker --beat`, runs
