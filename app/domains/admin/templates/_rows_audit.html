@@ -1,0 +1,14 @@
+<tbody class="dt-body">
+  {% if page.items %}
+  {% for a in page.items %}
+  <tr>
+    <td>{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '—' }}</td>
+    <td><code>{{ a.action }}</code></td>
+    <td>{{ a.target_type or '' }} {{ a.target_rid or '' }}</td>
+    <td>{{ a.detail or '' }}</td>
+  </tr>
+  {% endfor %}
+  {% else %}
+  <tr><td colspan="{{ columns|length }}" class="dt-empty">No admin actions recorded yet.</td></tr>
+  {% endif %}
+</tbody>

@@ -1,0 +1,18 @@
+<tbody class="dt-body">
+  {% if page.items %}
+  {% for u in page.items %}
+  <tr>
+    <td><a href="/admin/users/{{ u.rid }}">{{ u.email }}</a></td>
+    <td>{{ u.display_name }}</td>
+    <td>{{ u.phone or '—' }}</td>
+    <td>{{ u.role }}</td>
+    <td>{% if u.is_superadmin %}<span class="pill pill-warn">admin</span>{% else %}—{% endif %}</td>
+    <td>{{ u.family.name if u.family else '—' }}</td>
+    <td>{% if u.is_deleted %}<span class="pill pill-warn">deleted</span>{% else %}<span class="pill pill-ok">active</span>{% endif %}</td>
+    <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else '—' }}</td>
+  </tr>
+  {% endfor %}
+  {% else %}
+  <tr><td colspan="{{ columns|length }}" class="dt-empty">No users.</td></tr>
+  {% endif %}
+</tbody>

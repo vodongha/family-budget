@@ -1,0 +1,11 @@
+{# Info + pager for a server-side table. Buttons carry data-page; the JS in
+   base.html re-fetches the fragment on click. Included by both the full shell
+   and the AJAX fragment so they stay identical. #}
+<div class="dt-foot">
+  <span class="dt-info">{{ page.start }}–{{ page.end }} of {{ page.total }}</span>
+  <div class="dt-nav">
+    <button class="btn" type="button" data-page="{{ page.page - 1 }}"{% if page.page <= 1 %} disabled{% endif %}>‹</button>
+    <span class="dt-page">{{ page.page }} / {{ page.pages }}</span>
+    <button class="btn" type="button" data-page="{{ page.page + 1 }}"{% if page.page >= page.pages %} disabled{% endif %}>›</button>
+  </div>
+</div>

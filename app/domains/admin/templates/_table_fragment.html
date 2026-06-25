@@ -1,0 +1,6 @@
+{# AJAX response for a server-side table: the new <tbody> + footer. The <tbody>
+   is wrapped in a throwaway <table> so the browser's HTML parser keeps the
+   table rows intact (orphan <tbody>/<tr> are otherwise dropped); the JS in
+   base.html lifts the <tbody> out and swaps it into the live table. #}
+<table>{% include rows_template %}</table>
+{% include "_table_foot.html" %}

@@ -21,6 +21,13 @@ from app.core.config import settings
 from app.core.deps import SessionDep
 from app.domains.admin.deps_panel import dependency_report
 from app.domains.admin.money import to_major, to_minor
+from app.domains.admin.pagination import is_partial, table_params
+from app.domains.admin.repository import (
+    AUDIT_SORTS,
+    FAMILIES_SORTS,
+    TRANSACTIONS_SORTS,
+    USERS_SORTS,
+)
 from app.domains.admin.security import (
     LOGIN_PATH,
     AdminCsrfError,
@@ -81,6 +88,89 @@ def _ctx(
         "crumbs": crumbs or [],
         **extra,
     }
+
+
+# Column headers per server-side table. A blank ``key`` is a non-sortable
+# column (joined/derived values the query can't ORDER BY cheaply); a key must
+# match the table's *_SORTS map in the repository.
+_USERS_COLUMNS = [
+    {"key": "email", "label": "Email"},
+    {"key": "display_name", "label": "Name"},
+    {"key": "phone", "label": "Phone"},
+    {"key": "role", "label": "Role"},
+    {"key": "is_superadmin", "label": "Admin"},
+    {"key": "", "label": "Family"},
+    {"key": "is_deleted", "label": "Status"},
+    {"key": "created_at", "label": "Created"},
+]
+_FAMILIES_COLUMNS = [
+    {"key": "name", "label": "Name"},
+    {"key": "", "label": "Members"},
+    {"key": "", "label": "Wallets"},
+    {"key": "is_deleted", "label": "Status"},
+    {"key": "created_at", "label": "Created"},
+]
+_AUDIT_COLUMNS = [
+    {"key": "created_at", "label": "When"},
+    {"key": "action", "label": "Action"},
+    {"key": "", "label": "Target"},
+    {"key": "", "label": "Detail"},
+]
+_TRANSACTIONS_COLUMNS = [
+    {"key": "occurred_on", "label": "Date"},
+    {"key": "", "label": "Wallet"},
+    {"key": "type", "label": "Type"},
+    {"key": "amount", "label": "Amount"},
+    {"key": "", "label": "Category"},
+    {"key": "", "label": "By"},
+    {"key": "", "label": ""},
+]
+_WALLET_TXN_COLUMNS = [
+    {"key": "occurred_on", "label": "Date"},
+    {"key": "type", "label": "Type"},
+    {"key": "amount", "label": "Amount"},
+    {"key": "", "label": "Category"},
+    {"key": "", "label": "Note"},
+    {"key": "", "label": "By"},
+    {"key": "", "label": ""},
+]
+
+
+def _table(
+    request: Request,
+    admin: User,
+    *,
+    active: str,
+    crumbs: list[dict[str, str]],
+    page_template: str,
+    rows_template: str,
+    table_id: str,
+    endpoint: str,
+    columns: list[dict[str, str]],
+    page: Any,
+    **extra: Any,
+) -> HTMLResponse:
+    """Render a server-side table: the full page on a normal request, or just
+    the rows+footer fragment when the datatable JS asks for one (``?partial=1``).
+    """
+    data: dict[str, Any] = {
+        "table_id": table_id,
+        "endpoint": endpoint,
+        "columns": columns,
+        "rows_template": rows_template,
+        "page": page,
+        # Rows may carry per-row POST forms (e.g. delete), so the CSRF token has
+        # to travel with the fragment too, not just the full page.
+        "csrf": csrf_token(request),
+        **extra,
+    }
+    if is_partial(request):
+        return templates.TemplateResponse(request, "_table_fragment.html", data)
+    return templates.TemplateResponse(
+        request,
+        page_template,
+        {**_ctx(request, admin, active, crumbs=crumbs, **extra), **data},
+    )
 
 
 def _check_csrf(request: Request, csrf: str) -> bool:
@@ -152,16 +242,19 @@ def dashboard(request: Request, session: SessionDep, admin: CurrentAdmin) -> HTM
 
 @router.get("/users", response_class=HTMLResponse)
 def users_page(request: Request, session: SessionDep, admin: CurrentAdmin) -> HTMLResponse:
-    return templates.TemplateResponse(
+    params = table_params(request, allowed_sorts=USERS_SORTS, default_sort="created_at")
+    page = AdminService(session).users_page(params)
+    return _table(
         request,
-        "users.html",
-        _ctx(
-            request,
-            admin,
-            "users",
-            crumbs=[{"label": "Users"}],
-            users=AdminService(session).list_users(),
-        ),
+        admin,
+        active="users",
+        crumbs=[{"label": "Users"}],
+        page_template="users.html",
+        rows_template="_rows_users.html",
+        table_id="tbl-users",
+        endpoint="/admin/users",
+        columns=_USERS_COLUMNS,
+        page=page,
     )
 
 
@@ -169,31 +262,37 @@ def users_page(request: Request, session: SessionDep, admin: CurrentAdmin) -> HT
 def families_page(
     request: Request, session: SessionDep, admin: CurrentAdmin
 ) -> HTMLResponse:
-    return templates.TemplateResponse(
+    params = table_params(request, allowed_sorts=FAMILIES_SORTS, default_sort="created_at")
+    page = AdminService(session).families_page(params)
+    return _table(
         request,
-        "families.html",
-        _ctx(
-            request,
-            admin,
-            "families",
-            crumbs=[{"label": "Families"}],
-            rows=AdminService(session).list_families(),
-        ),
+        admin,
+        active="families",
+        crumbs=[{"label": "Families"}],
+        page_template="families.html",
+        rows_template="_rows_families.html",
+        table_id="tbl-families",
+        endpoint="/admin/families",
+        columns=_FAMILIES_COLUMNS,
+        page=page,
     )
 
 
 @router.get("/audit", response_class=HTMLResponse)
 def audit_page(request: Request, session: SessionDep, admin: CurrentAdmin) -> HTMLResponse:
-    return templates.TemplateResponse(
+    params = table_params(request, allowed_sorts=AUDIT_SORTS, default_sort="created_at")
+    page = AdminService(session).audit_page(params)
+    return _table(
         request,
-        "audit.html",
-        _ctx(
-            request,
-            admin,
-            "audit",
-            crumbs=[{"label": "Audit log"}],
-            entries=AdminService(session).recent_audit(limit=500),
-        ),
+        admin,
+        active="audit",
+        crumbs=[{"label": "Audit log"}],
+        page_template="audit.html",
+        rows_template="_rows_audit.html",
+        table_id="tbl-audit",
+        endpoint="/admin/audit",
+        columns=_AUDIT_COLUMNS,
+        page=page,
     )
 
 
@@ -461,18 +560,23 @@ def wallet_detail(
     if wallet is None:
         flash(request, "Wallet not found.", "error")
         return RedirectResponse("/admin/users", status_code=_REDIRECT)
-    return templates.TemplateResponse(
+    params = table_params(
+        request, allowed_sorts=TRANSACTIONS_SORTS, default_sort="occurred_on"
+    )
+    page = svc.transactions_dt(params, wallet_id=wallet.id)
+    return _table(
         request,
-        "wallet_detail.html",
-        _ctx(
-            request,
-            admin,
-            "users",
-            crumbs=[{"label": "Wallet"}, {"label": wallet.name}],
-            wallet=wallet,
-            balance=svc.wallet_balance(wallet),
-            txns=svc.transactions_all(wallet_id=wallet.id),
-        ),
+        admin,
+        active="users",
+        crumbs=[{"label": "Wallet"}, {"label": wallet.name}],
+        page_template="wallet_detail.html",
+        rows_template="_rows_wallet_txns.html",
+        table_id="tbl-wallet-txns",
+        endpoint=f"/admin/wallets/{wallet.rid}",
+        columns=_WALLET_TXN_COLUMNS,
+        page=page,
+        wallet=wallet,
+        balance=svc.wallet_balance(wallet),
     )
 
 
@@ -689,17 +793,21 @@ def txn_delete(
 def transactions_page(
     request: Request, session: SessionDep, admin: CurrentAdmin
 ) -> HTMLResponse:
-    svc = AdminService(session)
-    return templates.TemplateResponse(
+    params = table_params(
+        request, allowed_sorts=TRANSACTIONS_SORTS, default_sort="occurred_on"
+    )
+    page = AdminService(session).transactions_dt(params)
+    return _table(
         request,
-        "transactions.html",
-        _ctx(
-            request,
-            admin,
-            "transactions",
-            crumbs=[{"label": "Transactions"}],
-            txns=svc.transactions_all(),
-        ),
+        admin,
+        active="transactions",
+        crumbs=[{"label": "Transactions"}],
+        page_template="transactions.html",
+        rows_template="_rows_transactions.html",
+        table_id="tbl-transactions",
+        endpoint="/admin/transactions",
+        columns=_TRANSACTIONS_COLUMNS,
+        page=page,
     )
 
 
