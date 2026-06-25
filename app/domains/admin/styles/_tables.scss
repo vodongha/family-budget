@@ -92,4 +92,10 @@ th.dt-desc::after { content: '\2193'; opacity: .9; } // ↓
 
 .empty { color: var(--muted); padding: 14px; }
 
+// Server-side datatable: the in-table empty row + a subtle fade while a page
+// is being fetched over AJAX.
+.dt-empty { color: var(--muted); text-align: center; white-space: normal; }
+
+table.dt-loading { opacity: .55; transition: opacity .12s ease; }
+
 code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }

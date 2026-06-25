@@ -2,26 +2,5 @@
 {% block title %}Families{% endblock %}
 {% block heading %}Families{% endblock %}
 {% block content %}
-{% if rows %}
-<table class="dt" data-per-page="15">
-  <thead>
-    <tr>
-      <th>Name</th><th>Members</th><th>Wallets</th><th>Status</th><th>Created</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for r in rows %}
-    <tr>
-      <td><a href="/admin/families/{{ r.family.rid }}">{{ r.family.name }}</a></td>
-      <td>{{ r.members }}</td>
-      <td>{{ r.wallets }}</td>
-      <td>{% if r.family.is_deleted %}<span class="pill pill-warn">deleted</span>{% else %}<span class="pill pill-ok">active</span>{% endif %}</td>
-      <td>{{ r.family.created_at.strftime('%Y-%m-%d %H:%M') if r.family.created_at else '—' }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<div class="empty">No families.</div>
-{% endif %}
+{% include "_table.html" %}
 {% endblock %}

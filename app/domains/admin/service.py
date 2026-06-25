@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
 from app.domains.admin.models import AdminAuditLog
+from app.domains.admin.pagination import Page, TableParams
 from app.domains.admin.repository import AdminRepository
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.repository import TransactionRepository
@@ -78,6 +79,35 @@ class AdminService:
             }
             for f in self._repo.list_families()
         ]
+
+    # --- server-side datatable pages ----------------------------------------
+
+    def users_page(self, params: TableParams) -> Page:
+        return self._repo.users_page(params)
+
+    def families_page(self, params: TableParams) -> Page:
+        """One page of families, each decorated with its member + wallet counts
+        (computed only for the families on this page)."""
+        page = self._repo.families_page(params)
+        members = self._repo.family_member_counts()
+        wallets = self._repo.family_wallet_counts()
+        page.items = [
+            {
+                "family": f,
+                "members": members.get(f.id, 0),
+                "wallets": wallets.get(f.id, 0),
+            }
+            for f in page.items
+        ]
+        return page
+
+    def audit_page(self, params: TableParams) -> Page:
+        return self._repo.audit_page(params)
+
+    def transactions_dt(
+        self, params: TableParams, *, wallet_id: int | None = None
+    ) -> Page:
+        return self._repo.transactions_dt(params, wallet_id=wallet_id)
 
     def log(
         self,

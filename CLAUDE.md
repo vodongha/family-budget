@@ -311,13 +311,23 @@ compiled CSS is a **git-ignored build artifact** — edit the SCSS, never the ge
   rail** (icons only, state persisted in `localStorage`), and on mobile (≤860px) the sidebar is an
   **off-canvas drawer** opened by a topbar hamburger. The nav is **grouped with inline-SVG icons**
   (Overview / Manage / System) and each **group header is accordion-collapsible** (persisted).
-  Tables use a **self-contained datatable enhancer** (no CDN) — add `class="dt"` (and optional
-  `data-per-page`) and it gains a **page-size selector**, per-column **sort**, a **search** box,
-  and **pagination**; mark a non-sortable header with `data-nosort`. **Every admin table is a
-  `dt`** — one consistent style, no bespoke server-side pagination. Tables that could grow (the
-  transaction lists) load up to a cap (`AdminService.transactions_all`, default 2000) and let the
-  datatable page client-side. Editable rows (categories/budgets) are read-only `dt` tables with an
-  **Edit** link to a small edit page (an `<input>` cell would break `dt` search/sort).
+  Tables come in two flavours, both styled identically (`styles/_tables.scss`, the shared `.dt-*`
+  classes):
+  - **Server-side** (preferred for any table that can grow — Users, Families, Audit, the global
+    Transactions list, and a wallet's transactions). Sort / search / paging fetch **one page at a
+    time over AJAX** (`?page&per_page&sort&dir&q`); the JS (`table.dt-server` in `base.html`) swaps
+    the new `<tbody>` + footer in without a reload. Build one with the shared
+    `_table.html` shell + a per-table `_rows_*.html` partial; the route parses `table_params(...)`
+    (validating `sort` against the table's `*_SORTS` whitelist in `repository.py` so the query param
+    can never reach an arbitrary `ORDER BY`), gets a `pagination.Page`, and renders via the `_table`
+    helper — which returns the full page normally or just `_table_fragment.html` when
+    `is_partial(request)` (`?partial=1`). Mark a non-sortable column with a blank `key`.
+  - **Client-side** (`class="dt"`, legacy enhancer in `base.html`) still drives the small, bounded
+    embedded tables (dashboard recent activity, a user's wallets, a family's members/categories/
+    budgets, the Dependencies panel). Both enhancers coexist; convert a table by swapping `dt` →
+    the server-side shell when it needs to scale.
+  Editable rows (categories/budgets) are read-only tables with an **Edit** link to a small edit page
+  (an inline `<input>` cell would break sort/search).
 - **Management actions reuse the app's services, never raw writes.** Money rules stay intact:
   admin transaction create/edit/delete go through `TransactionRepository` (integer minor units of
   the wallet's currency, balances derived) — the admin layer only bypasses the `family_id`/owner
