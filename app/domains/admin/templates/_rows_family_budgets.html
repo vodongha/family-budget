@@ -1,0 +1,21 @@
+<tbody class="dt-body">
+  {% if page.items %}
+  {% for b in page.items %}
+  <tr>
+    <td>{{ b.category.name if b.category else '—' }}</td>
+    <td>{{ b.amount }}</td>
+    <td style="white-space:nowrap;">
+      <a href="/admin/budgets/{{ b.rid }}/edit">Edit</a>
+      <form method="post" action="/admin/budgets/{{ b.rid }}/delete" style="display:inline; margin-left:8px;"
+            onsubmit="return confirm('Delete this budget?');">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="family_rid" value="{{ family.rid }}">
+        <button class="btn btn-danger" type="submit" style="padding:3px 9px;">Delete</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  {% else %}
+  <tr><td colspan="{{ columns|length }}" class="dt-empty">No budgets.</td></tr>
+  {% endif %}
+</tbody>

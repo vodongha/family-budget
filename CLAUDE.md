@@ -19,8 +19,8 @@ The architecture deliberately mirrors a layered service design (the author's day
 - **Wiki:** https://github.com/vodongha/family-budget/wiki (Architecture, Connection & Wallet,
   Database & Migrations, API Reference, Testing, Git Workflow). Update the relevant wiki page when
   behaviour it documents changes.
-- **CI:** `.github/workflows/ci.yml` runs `ruff check` + `pytest` (SQLite, no ADB) on pushes/PRs to
-  `master`. Keep it green.
+- **CI:** `.github/workflows/ci.yml` runs `ruff check` + `pytest` (SQLite, no ADB) on pushes to
+  `develop` and PRs into `develop` or `master`. Keep it green.
 
 ## Technology stack
 
@@ -311,13 +311,23 @@ compiled CSS is a **git-ignored build artifact** — edit the SCSS, never the ge
   rail** (icons only, state persisted in `localStorage`), and on mobile (≤860px) the sidebar is an
   **off-canvas drawer** opened by a topbar hamburger. The nav is **grouped with inline-SVG icons**
   (Overview / Manage / System) and each **group header is accordion-collapsible** (persisted).
-  Tables use a **self-contained datatable enhancer** (no CDN) — add `class="dt"` (and optional
-  `data-per-page`) and it gains a **page-size selector**, per-column **sort**, a **search** box,
-  and **pagination**; mark a non-sortable header with `data-nosort`. **Every admin table is a
-  `dt`** — one consistent style, no bespoke server-side pagination. Tables that could grow (the
-  transaction lists) load up to a cap (`AdminService.transactions_all`, default 2000) and let the
-  datatable page client-side. Editable rows (categories/budgets) are read-only `dt` tables with an
-  **Edit** link to a small edit page (an `<input>` cell would break `dt` search/sort).
+  **Every admin table is server-side** (sort / search / paging fetch **one page at a time over
+  AJAX**: `?page&per_page&sort&dir&q`); the JS (`table.dt-server` in `base.html`) swaps the new
+  `<tbody>` + footer in without a reload (the fragment wraps rows in a throwaway `<table>` so the
+  parser keeps them). Styling is the shared `.dt-*` classes (`styles/_tables.scss`). Build one with:
+  - the shared **`_table.html`** shell + a per-table **`_rows_*.html`** partial (`<tbody>` rows);
+  - a route that parses **`table_params(...)`** (validating `sort` against a whitelist so the query
+    param can never reach an arbitrary `ORDER BY`) and returns the full page or, on
+    `is_partial(request)` (`?partial=1`), just **`_table_fragment.html`**.
+  Two data paths: **DB-backed** tables (Users / Families / Audit / Transactions / a wallet's
+  transactions) use `pagination.paginate()` + the repo's `*_SORTS` maps (real `LIMIT/OFFSET` +
+  `COUNT`); **small derived** tables (a user's wallets, a family's members/wallets/categories/
+  budgets, the dependency report) use `pagination.paginate_iterable()` (sort/search/slice a bounded
+  in-memory list). A **detail page that hosts several tables** (user, family) keeps one route that
+  dispatches fragments by a **`?table=<name>`** param, and the dashboard's "recent activity" reuses
+  the `/admin/audit` endpoint. Editable rows (categories/budgets) are read-only tables with an
+  **Edit** link to a small edit page (an inline `<input>` cell would break sort/search). The legacy
+  client-side `dt` enhancer is still in `base.html` but no longer used by any template.
 - **Management actions reuse the app's services, never raw writes.** Money rules stay intact:
   admin transaction create/edit/delete go through `TransactionRepository` (integer minor units of
   the wallet's currency, balances derived) — the admin layer only bypasses the `family_id`/owner
@@ -340,7 +350,9 @@ compiled CSS is a **git-ignored build artifact** — edit the SCSS, never the ge
   GitHub is the source of truth, we don't re-implement version diffing or a CVE DB. Results are
   cached per repo (1h; `?refresh=1` bypasses) and shown as datatables (package / ecosystem /
   severity / vulnerable range / patched version). No token → a setup hint. A `.github/dependabot.yml`
-  also opens weekly version-update PRs for pip + actions.
+  also opens weekly version-update PRs for pip + actions, **targeting `develop`** (not the default
+  branch); `dependabot-auto-merge.yml` merges them once CI is green, so they reach `master` via the
+  normal release PR.
 
 ### Privacy policy (`app/domains/legal/`)
 
@@ -535,7 +547,7 @@ Production runs on **Fly.io**, region `sin` (Singapore — closest to ADB), doma
 
 - **CI/CD:** `.github/workflows/deploy.yml` deploys on push to `master` (ruff + pytest →
   `flyctl deploy --remote-only`, needs the `FLY_API_TOKEN` repo secret). `ci.yml` runs the same
-  checks on PRs to `master` and pushes to `develop`. `sync-develop.yml` merges `master → develop`
+  checks on pushes to `develop` and PRs into `develop`/`master`. `sync-develop.yml` merges `master → develop`
   after each deploy. Mirrors the `vodongha-personal` website setup.
 - **`fly.toml`:** two process groups from one image — `app` (FastAPI, the only HTTP group;
   `auto_stop = suspend`, `min_machines_running = 0`) and `worker` (`celery worker --beat`, runs

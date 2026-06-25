@@ -1,0 +1,14 @@
+<tbody class="dt-body">
+  {% if page.items %}
+  {% for w in page.items %}
+  <tr>
+    <td>{{ w.wallet.name }}</td>
+    <td>{{ w.wallet.currency }}</td>
+    <td>{{ w.balance | money(w.wallet.currency) }} {{ w.wallet.currency }}</td>
+    <td><a href="/admin/wallets/{{ w.wallet.rid }}">Open</a></td>
+  </tr>
+  {% endfor %}
+  {% else %}
+  <tr><td colspan="{{ columns|length }}" class="dt-empty">No wallets.</td></tr>
+  {% endif %}
+</tbody>

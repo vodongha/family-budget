@@ -5,11 +5,11 @@ name: Dependabot auto-merge
 # merged after ruff + pytest have passed — never before. It runs in the
 # trusted base-repo context.
 #
-# The merge uses GH_PAT, not the default GITHUB_TOKEN: a push made with
-# GITHUB_TOKEN does NOT trigger further workflows, which would skip the Deploy
-# and Sync-develop workflows. With a PAT the merge to master fires Deploy
-# (lint -> test -> deploy to Fly.io) last, only once everything passes, and
-# sync-develop merges master back into develop.
+# Dependabot targets develop (see .github/dependabot.yml), so the merge lands
+# on develop and reaches master via the normal release PR — it never deploys
+# straight from a dep bump. The merge uses GH_PAT, not the default GITHUB_TOKEN:
+# a push made with GITHUB_TOKEN does NOT trigger further workflows, so with the
+# PAT the merge to develop still fires the develop CI run.
 on:
   workflow_run:
     workflows: ["CI"]

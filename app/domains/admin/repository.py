@@ -11,11 +11,40 @@ from sqlalchemy import and_, false, func, or_, select, true
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.domains.admin.models import AdminAuditLog
+from app.domains.admin.pagination import Page, TableParams, paginate
 from app.domains.categories.models import Category
 from app.domains.transactions.models import Transaction
 from app.domains.users.models import Family, User, UserRole
 from app.domains.wallets.models import Wallet, WalletScope
 from app.domains.wallets.repository import visibility_clause
+
+# Sortable columns per table — the single source of truth shared by the route
+# (which validates the ``sort`` query param against the keys) and the paginated
+# query (which maps a key to its column). A key absent here can never reach an
+# ORDER BY, so the query param is safe to take from the client.
+USERS_SORTS = {
+    "email": User.email,
+    "display_name": User.display_name,
+    "phone": User.phone,
+    "role": User.role,
+    "is_superadmin": User.is_superadmin,
+    "is_deleted": User.is_deleted,
+    "created_at": User.created_at,
+}
+FAMILIES_SORTS = {
+    "name": Family.name,
+    "is_deleted": Family.is_deleted,
+    "created_at": Family.created_at,
+}
+AUDIT_SORTS = {
+    "created_at": AdminAuditLog.created_at,
+    "action": AdminAuditLog.action,
+}
+TRANSACTIONS_SORTS = {
+    "occurred_on": Transaction.occurred_on,
+    "type": Transaction.type,
+    "amount": Transaction.amount,
+}
 
 
 class AdminRepository:
@@ -101,6 +130,69 @@ class AdminRepository:
 
     def family_wallet_counts(self) -> dict[int, int]:
         return self._counts_by_family(Wallet.family_id)
+
+    # --- server-side datatable pages (sort / search / paginate) --------------
+
+    def users_page(self, params: TableParams) -> Page:
+        return paginate(
+            self._session,
+            select(User),
+            params,
+            sort_columns=USERS_SORTS,
+            search_columns=[User.email, User.display_name, User.phone],
+            tiebreak=User.id,
+            options=[joinedload(User.family)],
+        )
+
+    def families_page(self, params: TableParams) -> Page:
+        return paginate(
+            self._session,
+            select(Family),
+            params,
+            sort_columns=FAMILIES_SORTS,
+            search_columns=[Family.name],
+            tiebreak=Family.id,
+        )
+
+    def audit_page(self, params: TableParams) -> Page:
+        return paginate(
+            self._session,
+            select(AdminAuditLog),
+            params,
+            sort_columns=AUDIT_SORTS,
+            search_columns=[
+                AdminAuditLog.action,
+                AdminAuditLog.target_rid,
+                AdminAuditLog.detail,
+            ],
+            tiebreak=AdminAuditLog.id,
+        )
+
+    def transactions_dt(
+        self,
+        params: TableParams,
+        *,
+        wallet_id: int | None = None,
+        created_by_user_id: int | None = None,
+    ) -> Page:
+        base = select(Transaction)
+        if wallet_id is not None:
+            base = base.where(Transaction.wallet_id == wallet_id)
+        if created_by_user_id is not None:
+            base = base.where(Transaction.created_by_user_id == created_by_user_id)
+        return paginate(
+            self._session,
+            base,
+            params,
+            sort_columns=TRANSACTIONS_SORTS,
+            search_columns=[Transaction.note, Transaction.type],
+            tiebreak=Transaction.id,
+            options=[
+                selectinload(Transaction.wallet),
+                selectinload(Transaction.category),
+                selectinload(Transaction.creator),
+            ],
+        )
 
     # --- single-entity getters (cross-tenant) --------------------------------
 

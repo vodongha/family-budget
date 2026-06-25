@@ -178,8 +178,8 @@ def test_list_pages_render_for_admin(client: TestClient, db_session: Session) ->
         res = client.get(path)
         assert res.status_code == 200
         assert marker in res.text
-        # The datatable enhancer hook is present on list tables.
-        assert 'class="dt"' in res.text or "No " in res.text
+        # The server-side datatable hook is present on list tables.
+        assert 'class="dt-server"' in res.text
 
 
 def test_users_page_lists_the_admin(client: TestClient, db_session: Session) -> None:
@@ -511,3 +511,95 @@ def test_logout_clears_session(client: TestClient, db_session: Session) -> None:
     assert client.get("/admin", follow_redirects=False).status_code == 200
     client.post("/admin/logout", data={"csrf": csrf}, follow_redirects=False)
     assert client.get("/admin", follow_redirects=False).status_code == 303
+
+
+def test_users_table_partial_returns_fragment(
+    client: TestClient, db_session: Session
+) -> None:
+    """The AJAX endpoint returns just the rows + footer, not the whole shell."""
+    _make_admin(db_session)
+    _make_user(db_session, email="alice@example.com")
+    _login(client)
+    res = client.get("/admin/users?partial=1")
+    assert res.status_code == 200
+    assert "<tbody" in res.text
+    assert "dt-foot" in res.text
+    # No surrounding page chrome — it's a fragment, not a full page.
+    assert 'class="sidebar"' not in res.text
+    assert "<!doctype html>" not in res.text.lower()
+
+
+def test_users_table_search_filters_rows(
+    client: TestClient, db_session: Session
+) -> None:
+    _make_admin(db_session)
+    _make_user(db_session, email="needle@example.com")
+    _make_user(db_session, email="haystack@example.com")
+    _login(client)
+    res = client.get("/admin/users?partial=1&q=needle")
+    assert res.status_code == 200
+    assert "needle@example.com" in res.text
+    assert "haystack@example.com" not in res.text
+
+
+def test_users_table_pagination_caps_rows(
+    client: TestClient, db_session: Session
+) -> None:
+    _make_admin(db_session)
+    for i in range(15):
+        _make_user(db_session, email=f"u{i:02d}@example.com")
+    _login(client)
+    res = client.get("/admin/users?partial=1&per_page=10")
+    assert res.status_code == 200
+    # 16 users total (15 + the admin) → first page shows exactly 10 rows.
+    assert res.text.count("<tr>") == 10
+    assert "of 16" in res.text
+
+
+def test_table_sort_param_is_whitelisted(
+    client: TestClient, db_session: Session
+) -> None:
+    """An unknown sort key falls back to the default instead of erroring."""
+    _make_admin(db_session)
+    _login(client)
+    res = client.get("/admin/users?partial=1&sort=__injection__&dir=desc")
+    assert res.status_code == 200
+
+
+def test_user_detail_table_partials(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    owner = _make_user(db_session, email="ud@example.com")
+    _make_wallet(db_session, owner)
+    _login(client)
+
+    wallets = client.get(f"/admin/users/{owner.rid}?partial=1&table=wallets")
+    assert wallets.status_code == 200
+    assert "<tbody" in wallets.text
+    assert "Cash" in wallets.text
+    assert 'class="sidebar"' not in wallets.text
+
+    txns = client.get(f"/admin/users/{owner.rid}?partial=1&table=txns")
+    assert txns.status_code == 200
+    assert "dt-foot" in txns.text
+
+
+def test_family_detail_table_partials(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    fam = _make_family(db_session)
+    _login(client)
+    for table in ("members", "wallets", "categories", "budgets"):
+        res = client.get(f"/admin/families/{fam.rid}?partial=1&table={table}")
+        assert res.status_code == 200, table
+        assert "<tbody" in res.text
+        assert 'class="sidebar"' not in res.text
+
+
+def test_dashboard_recent_activity_is_server_side(
+    client: TestClient, db_session: Session
+) -> None:
+    _make_admin(db_session)
+    _login(client)
+    res = client.get("/admin")
+    assert res.status_code == 200
+    assert 'id="tbl-dash-audit"' in res.text
+    assert "dt-server" in res.text

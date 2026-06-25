@@ -141,6 +141,100 @@
     render();
   }
   document.querySelectorAll('table.dt').forEach(initDataTable);
+
+  // --- server-side datatable: sort/search/paginate fetch one page over AJAX ---
+  function initServerDt(table) {
+    var wrap = table.closest('.dt-wrap');
+    if (!wrap || !table.tHead) return;
+    var endpoint = table.dataset.endpoint;
+    var sizeSel = wrap.querySelector('.dt-size');
+    var search = wrap.querySelector('.dt-search');
+    var state = {
+      sort: table.dataset.sort || '',
+      dir: table.dataset.dir || 'asc',
+      perPage: parseInt(table.dataset.perPage || '25', 10),
+      page: 1,
+      q: search ? search.value : ''
+    };
+    var busy = false;
+
+    function syncHeaders() {
+      Array.prototype.forEach.call(table.tHead.rows[0].cells, function (th) {
+        th.classList.remove('dt-asc', 'dt-desc');
+        if (th.dataset.key && th.dataset.key === state.sort) {
+          th.classList.add(state.dir === 'desc' ? 'dt-desc' : 'dt-asc');
+        }
+      });
+    }
+    function bindFoot() {
+      wrap.querySelectorAll('.dt-foot [data-page]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (b.disabled) return;
+          state.page = parseInt(b.dataset.page, 10);
+          load();
+        });
+      });
+    }
+    function load() {
+      if (busy) return;
+      busy = true;
+      table.classList.add('dt-loading');
+      var qs = new URLSearchParams({
+        partial: '1', page: state.page, per_page: state.perPage,
+        sort: state.sort, dir: state.dir, q: state.q
+      });
+      // The endpoint may already carry a query param (e.g. ?table=wallets on a
+      // detail page that hosts several tables), so pick the right separator.
+      var sep = endpoint.indexOf('?') >= 0 ? '&' : '?';
+      fetch(endpoint + sep + qs.toString(), { headers: { 'X-Requested-With': 'fetch' } })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          var nb = doc.querySelector('tbody');
+          var nf = doc.querySelector('.dt-foot');
+          var ob = table.querySelector('tbody');
+          var of = wrap.querySelector('.dt-foot');
+          if (nb && ob) ob.replaceWith(nb);
+          if (nf && of) of.replaceWith(nf);
+          syncHeaders();
+          bindFoot();
+        })
+        .catch(function () {})
+        .then(function () { busy = false; table.classList.remove('dt-loading'); });
+    }
+
+    Array.prototype.forEach.call(table.tHead.rows[0].cells, function (th) {
+      if (!th.dataset.key) return;
+      th.classList.add('dt-sortable');
+      th.addEventListener('click', function () {
+        if (state.sort === th.dataset.key) {
+          state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sort = th.dataset.key;
+          state.dir = 'asc';
+        }
+        state.page = 1;
+        load();
+      });
+    });
+    if (search) {
+      var t;
+      search.addEventListener('input', function () {
+        clearTimeout(t);
+        t = setTimeout(function () { state.q = search.value; state.page = 1; load(); }, 300);
+      });
+    }
+    if (sizeSel) {
+      sizeSel.addEventListener('change', function () {
+        state.perPage = parseInt(sizeSel.value, 10);
+        state.page = 1;
+        load();
+      });
+    }
+    syncHeaders();
+    bindFoot();
+  }
+  document.querySelectorAll('table.dt-server').forEach(initServerDt);
 })();
 </script>
 </body>

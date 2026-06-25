@@ -4,7 +4,10 @@ on:
   push:
     branches: [develop]
   pull_request:
-    branches: [master]
+    # Run on PRs into develop too — Dependabot now targets develop, and the
+    # auto-merge workflow keys off this CI run completing, so without it a
+    # Dependabot PR would never be checked or merged.
+    branches: [develop, master]
 
 jobs:
   test:

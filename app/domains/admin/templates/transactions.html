@@ -2,26 +2,5 @@
 {% block title %}Transactions{% endblock %}
 {% block heading %}Transactions{% endblock %}
 {% block content %}
-{% if txns %}
-<table class="dt" data-per-page="25">
-  <thead>
-    <tr><th>Date</th><th>Wallet</th><th>Type</th><th>Amount</th><th>Category</th><th>By</th><th data-nosort></th></tr>
-  </thead>
-  <tbody>
-    {% for t in txns %}
-    <tr>
-      <td>{{ t.occurred_on.isoformat() }}</td>
-      <td><a href="/admin/wallets/{{ t.wallet.rid }}">{{ t.wallet.name }}</a></td>
-      <td>{{ t.type }}</td>
-      <td>{{ t.amount | money(t.wallet.currency) }} {{ t.wallet.currency }}</td>
-      <td>{{ t.category.name if t.category else '—' }}</td>
-      <td>{{ t.creator.display_name if t.creator else '—' }}</td>
-      <td>{% if not t.transfer_group_rid %}<a href="/admin/transactions/{{ t.rid }}/edit">Edit</a>{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<div class="empty">No transactions.</div>
-{% endif %}
+{% include "_table.html" %}
 {% endblock %}

@@ -1,0 +1,32 @@
+{# Reusable server-side datatable shell. Include it with:
+     table_id, endpoint, columns (list of {key,label}; blank key = not sortable),
+     page (a pagination.Page), rows_template (the per-table <tbody> partial),
+     and optional searchable (default true).
+   The JS in base.html (table.dt-server) drives sort/search/paging over AJAX. #}
+{% set searchable = searchable if searchable is defined else true %}
+<div class="dt-wrap">
+  <div class="dt-bar">
+    <div class="dt-left">
+      <span>Show</span>
+      <select class="dt-size">
+        {% for n in page.page_sizes %}<option value="{{ n }}"{% if n == page.per_page %} selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+      <span>per page</span>
+    </div>
+    {% if searchable %}<input type="search" class="dt-search" placeholder="Search…" value="{{ page.q }}" autocomplete="off">{% endif %}
+  </div>
+  <div class="dt-scroll">
+    <table id="{{ table_id }}" class="dt-server" data-endpoint="{{ endpoint }}"
+           data-sort="{{ page.sort }}" data-dir="{{ page.dir }}" data-per-page="{{ page.per_page }}">
+      <thead>
+        <tr>
+          {% for c in columns %}
+          <th{% if c.key %} class="dt-sortable" data-key="{{ c.key }}"{% else %} data-nosort{% endif %}>{{ c.label }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      {% include rows_template %}
+    </table>
+  </div>
+  {% include "_table_foot.html" %}
+</div>

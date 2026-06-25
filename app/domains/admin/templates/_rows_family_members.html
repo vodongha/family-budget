@@ -1,0 +1,14 @@
+<tbody class="dt-body">
+  {% if page.items %}
+  {% for m in page.items %}
+  <tr>
+    <td>{{ m.display_name }}</td>
+    <td>{{ m.email }}</td>
+    <td>{{ m.role }}</td>
+    <td><a href="/admin/users/{{ m.rid }}">Open</a></td>
+  </tr>
+  {% endfor %}
+  {% else %}
+  <tr><td colspan="{{ columns|length }}" class="dt-empty">No members.</td></tr>
+  {% endif %}
+</tbody>
