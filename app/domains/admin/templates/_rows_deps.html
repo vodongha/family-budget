@@ -1,0 +1,21 @@
+<tbody class="dt-body">
+  {% if page.items %}
+  {% for a in page.items %}
+  <tr>
+    <td>{{ a.package }}</td>
+    <td>{{ a.ecosystem }}</td>
+    <td>
+      {% if a.severity in ('critical', 'high') %}<span class="pill flash-error" style="border:none;">{{ a.severity }}</span>
+      {% elif a.severity == 'medium' %}<span class="pill pill-warn">{{ a.severity }}</span>
+      {% else %}<span class="pill" style="background:var(--surface-2); color:var(--muted);">{{ a.severity or '—' }}</span>{% endif %}
+    </td>
+    <td>{{ a.vulnerable_range or '—' }}</td>
+    <td>{{ a.patched or '—' }}</td>
+    <td>{{ a.created_at }}</td>
+    <td>{% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener">View</a>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  {% else %}
+  <tr><td colspan="{{ columns|length }}" class="dt-empty">No open Dependabot alerts. 🎉</td></tr>
+  {% endif %}
+</tbody>

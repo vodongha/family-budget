@@ -134,6 +134,82 @@ _WALLET_TXN_COLUMNS = [
     {"key": "", "label": "By"},
     {"key": "", "label": ""},
 ]
+_USER_WALLET_COLUMNS = [
+    {"key": "name", "label": "Name"},
+    {"key": "currency", "label": "Currency"},
+    {"key": "visibility", "label": "Visibility"},
+    {"key": "balance", "label": "Balance"},
+    {"key": "", "label": ""},
+]
+_USER_TXN_COLUMNS = [
+    {"key": "occurred_on", "label": "Date"},
+    {"key": "", "label": "Wallet"},
+    {"key": "type", "label": "Type"},
+    {"key": "amount", "label": "Amount"},
+    {"key": "", "label": "Note"},
+]
+_FAMILY_MEMBER_COLUMNS = [
+    {"key": "display_name", "label": "Name"},
+    {"key": "email", "label": "Email"},
+    {"key": "role", "label": "Role"},
+    {"key": "", "label": ""},
+]
+_FAMILY_WALLET_COLUMNS = [
+    {"key": "name", "label": "Name"},
+    {"key": "currency", "label": "Currency"},
+    {"key": "balance", "label": "Balance"},
+    {"key": "", "label": ""},
+]
+_FAMILY_CATEGORY_COLUMNS = [
+    {"key": "name", "label": "Name"},
+    {"key": "kind", "label": "Kind"},
+    {"key": "", "label": "Icon"},
+    {"key": "", "label": "Color"},
+    {"key": "", "label": ""},
+]
+_FAMILY_BUDGET_COLUMNS = [
+    {"key": "category", "label": "Category"},
+    {"key": "amount", "label": "Limit (VND)"},
+    {"key": "", "label": ""},
+]
+_DEPS_COLUMNS = [
+    {"key": "package", "label": "Package"},
+    {"key": "ecosystem", "label": "Ecosystem"},
+    {"key": "severity", "label": "Severity"},
+    {"key": "", "label": "Vulnerable"},
+    {"key": "", "label": "Patched"},
+    {"key": "created_at", "label": "Opened"},
+    {"key": "", "label": ""},
+]
+
+
+def _sort_keys(columns: list[dict[str, str]]) -> dict[str, str]:
+    """The sortable keys of a column set — passed to ``table_params`` to validate
+    the ``sort`` query param for the in-memory (derived) tables."""
+    return {c["key"]: c["key"] for c in columns if c["key"]}
+
+
+def _fragment(
+    request: Request,
+    *,
+    rows_template: str,
+    columns: list[dict[str, str]],
+    page: Any,
+    **extra: Any,
+) -> HTMLResponse:
+    """Render just the rows+footer fragment for one server-side table (used by
+    detail pages that host several tables, dispatched by a ``?table=`` param)."""
+    return templates.TemplateResponse(
+        request,
+        "_table_fragment.html",
+        {
+            "rows_template": rows_template,
+            "columns": columns,
+            "page": page,
+            "csrf": csrf_token(request),
+            **extra,
+        },
+    )
 
 
 def _table(
@@ -234,9 +310,25 @@ def logout(request: Request, csrf: Annotated[str, Form()] = "") -> RedirectRespo
 
 @router.get("", response_class=HTMLResponse)
 def dashboard(request: Request, session: SessionDep, admin: CurrentAdmin) -> HTMLResponse:
-    data = AdminService(session).dashboard()
+    svc = AdminService(session)
+    data = svc.dashboard()
+    # The "recent activity" widget is the audit table, backed by the /admin/audit
+    # server-side endpoint (so sort/search/paging fetch from there).
+    audit = svc.audit_page(
+        table_params(request, allowed_sorts=AUDIT_SORTS, default_sort="created_at")
+    )
     return templates.TemplateResponse(
-        request, "dashboard.html", _ctx(request, admin, "dashboard", **data)
+        request,
+        "dashboard.html",
+        _ctx(
+            request,
+            admin,
+            "dashboard",
+            metrics=data["metrics"],
+            rates_updated_at=data["rates_updated_at"],
+            audit_page=audit,
+            audit_columns=_AUDIT_COLUMNS,
+        ),
     )
 
 
@@ -370,8 +462,40 @@ def user_detail(
     if user is None:
         flash(request, "User not found.", "error")
         return RedirectResponse("/admin/users", status_code=_REDIRECT)
-    wallets = svc.user_wallets(user)
-    txns = svc.transactions(created_by_user_id=user.id, page=1, per_page=10)
+
+    def wallets_page() -> Any:
+        return svc.user_wallets_page(
+            user,
+            table_params(
+                request,
+                allowed_sorts=_sort_keys(_USER_WALLET_COLUMNS),
+                default_sort="name",
+            ),
+        )
+
+    def txns_page() -> Any:
+        return svc.transactions_dt(
+            table_params(
+                request, allowed_sorts=TRANSACTIONS_SORTS, default_sort="occurred_on"
+            ),
+            created_by_user_id=user.id,
+        )
+
+    if is_partial(request):
+        if request.query_params.get("table") == "txns":
+            return _fragment(
+                request,
+                rows_template="_rows_user_txns.html",
+                columns=_USER_TXN_COLUMNS,
+                page=txns_page(),
+            )
+        return _fragment(
+            request,
+            rows_template="_rows_user_wallets.html",
+            columns=_USER_WALLET_COLUMNS,
+            page=wallets_page(),
+        )
+
     return templates.TemplateResponse(
         request,
         "user_detail.html",
@@ -381,8 +505,10 @@ def user_detail(
             "users",
             crumbs=[{"label": "Users", "href": "/admin/users"}, {"label": user.email}],
             user=user,
-            wallets=wallets,
-            txns=txns["rows"],
+            wallets_page=wallets_page(),
+            wallets_columns=_USER_WALLET_COLUMNS,
+            txns_page=txns_page(),
+            txns_columns=_USER_TXN_COLUMNS,
         ),
     )
 
@@ -823,7 +949,79 @@ def family_detail(
     if family is None:
         flash(request, "Family not found.", "error")
         return RedirectResponse("/admin/families", status_code=_REDIRECT)
-    overview = svc.family_overview(family)
+
+    def members_p() -> Any:
+        return svc.family_members_page(
+            family,
+            table_params(
+                request,
+                allowed_sorts=_sort_keys(_FAMILY_MEMBER_COLUMNS),
+                default_sort="display_name",
+            ),
+        )
+
+    def wallets_p() -> Any:
+        return svc.family_wallets_page(
+            family,
+            table_params(
+                request,
+                allowed_sorts=_sort_keys(_FAMILY_WALLET_COLUMNS),
+                default_sort="name",
+            ),
+        )
+
+    def categories_p() -> Any:
+        return svc.family_categories_page(
+            family,
+            table_params(
+                request,
+                allowed_sorts=_sort_keys(_FAMILY_CATEGORY_COLUMNS),
+                default_sort="name",
+            ),
+        )
+
+    def budgets_p() -> Any:
+        return svc.family_budgets_page(
+            family,
+            table_params(
+                request,
+                allowed_sorts=_sort_keys(_FAMILY_BUDGET_COLUMNS),
+                default_sort="category",
+            ),
+        )
+
+    if is_partial(request):
+        table = request.query_params.get("table")
+        if table == "members":
+            return _fragment(
+                request,
+                rows_template="_rows_family_members.html",
+                columns=_FAMILY_MEMBER_COLUMNS,
+                page=members_p(),
+            )
+        if table == "wallets":
+            return _fragment(
+                request,
+                rows_template="_rows_family_wallets.html",
+                columns=_FAMILY_WALLET_COLUMNS,
+                page=wallets_p(),
+            )
+        if table == "budgets":
+            return _fragment(
+                request,
+                rows_template="_rows_family_budgets.html",
+                columns=_FAMILY_BUDGET_COLUMNS,
+                page=budgets_p(),
+                family=family,
+            )
+        return _fragment(
+            request,
+            rows_template="_rows_family_categories.html",
+            columns=_FAMILY_CATEGORY_COLUMNS,
+            page=categories_p(),
+            family=family,
+        )
+
     return templates.TemplateResponse(
         request,
         "family_detail.html",
@@ -837,7 +1035,15 @@ def family_detail(
             ],
             family=family,
             kinds=[k.value for k in CategoryKind],
-            **overview,
+            categories=svc.family_categories_all(family),
+            members_page=members_p(),
+            members_columns=_FAMILY_MEMBER_COLUMNS,
+            wallets_page=wallets_p(),
+            wallets_columns=_FAMILY_WALLET_COLUMNS,
+            categories_page=categories_p(),
+            categories_columns=_FAMILY_CATEGORY_COLUMNS,
+            budgets_page=budgets_p(),
+            budgets_columns=_FAMILY_BUDGET_COLUMNS,
         ),
     )
 
@@ -1172,6 +1378,35 @@ def dependencies_page(
     request: Request, session: SessionDep, admin: CurrentAdmin
 ) -> HTMLResponse:
     force = request.query_params.get("refresh") == "1"
+    report = dependency_report(force=force)
+    svc = AdminService(session)
+
+    def alerts_page(alerts: list[dict[str, Any]]) -> Any:
+        return svc.deps_alerts_page(
+            alerts,
+            table_params(
+                request, allowed_sorts=_sort_keys(_DEPS_COLUMNS), default_sort="package"
+            ),
+        )
+
+    if is_partial(request):
+        repo_name = request.query_params.get("repo")
+        alerts = next(
+            (r["alerts"] for r in report["repos"] if r["repo"] == repo_name and r["ok"]),
+            [],
+        )
+        return _fragment(
+            request,
+            rows_template="_rows_deps.html",
+            columns=_DEPS_COLUMNS,
+            page=alerts_page(alerts),
+        )
+
+    deps_pages = {
+        r["repo"]: alerts_page(r["alerts"])
+        for r in report["repos"]
+        if r["ok"] and r["alerts"]
+    }
     return templates.TemplateResponse(
         request,
         "deps.html",
@@ -1180,7 +1415,9 @@ def dependencies_page(
             admin,
             "deps",
             crumbs=[{"label": "Dependencies"}],
-            report=dependency_report(force=force),
+            report=report,
+            deps_pages=deps_pages,
+            deps_columns=_DEPS_COLUMNS,
         ),
     )
 

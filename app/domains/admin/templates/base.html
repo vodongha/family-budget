@@ -183,7 +183,10 @@
         partial: '1', page: state.page, per_page: state.perPage,
         sort: state.sort, dir: state.dir, q: state.q
       });
-      fetch(endpoint + '?' + qs.toString(), { headers: { 'X-Requested-With': 'fetch' } })
+      // The endpoint may already carry a query param (e.g. ?table=wallets on a
+      // detail page that hosts several tables), so pick the right separator.
+      var sep = endpoint.indexOf('?') >= 0 ? '&' : '?';
+      fetch(endpoint + sep + qs.toString(), { headers: { 'X-Requested-With': 'fetch' } })
         .then(function (r) { return r.text(); })
         .then(function (html) {
           var doc = new DOMParser().parseFromString(html, 'text/html');

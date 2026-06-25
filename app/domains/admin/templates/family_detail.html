@@ -5,8 +5,8 @@
 
 <div class="detail-grid">
   <div class="kv"><div class="k">Status</div><div class="v">{{ 'deleted' if family.is_deleted else 'active' }}</div></div>
-  <div class="kv"><div class="k">Members</div><div class="v">{{ members | length }}</div></div>
-  <div class="kv"><div class="k">Wallets</div><div class="v">{{ wallets | length }}</div></div>
+  <div class="kv"><div class="k">Members</div><div class="v">{{ members_page.total }}</div></div>
+  <div class="kv"><div class="k">Wallets</div><div class="v">{{ wallets_page.total }}</div></div>
   <div class="kv"><div class="k">Created</div><div class="v">{{ family.created_at.strftime('%Y-%m-%d %H:%M') if family.created_at else '—' }}</div></div>
 </div>
 
@@ -31,61 +31,32 @@
 
 <section>
   <h2>Members</h2>
-  {% if members %}
-  <table class="dt" data-per-page="10">
-    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th data-nosort></th></tr></thead>
-    <tbody>
-      {% for m in members %}
-      <tr><td>{{ m.display_name }}</td><td>{{ m.email }}</td><td>{{ m.role }}</td>
-        <td><a href="/admin/users/{{ m.rid }}">Open</a></td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}<div class="empty">No members.</div>{% endif %}
+  {% with table_id="tbl-fam-members",
+          endpoint="/admin/families/" ~ family.rid ~ "?table=members",
+          columns=members_columns, page=members_page,
+          rows_template="_rows_family_members.html" %}
+    {% include "_table.html" %}
+  {% endwith %}
 </section>
 
 <section>
   <h2>Wallets</h2>
-  {% if wallets %}
-  <table class="dt" data-per-page="10">
-    <thead><tr><th>Name</th><th>Currency</th><th>Balance</th><th data-nosort></th></tr></thead>
-    <tbody>
-      {% for w in wallets %}
-      <tr><td>{{ w.wallet.name }}</td><td>{{ w.wallet.currency }}</td>
-        <td>{{ w.balance | money(w.wallet.currency) }} {{ w.wallet.currency }}</td>
-        <td><a href="/admin/wallets/{{ w.wallet.rid }}">Open</a></td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}<div class="empty">No wallets.</div>{% endif %}
+  {% with table_id="tbl-fam-wallets",
+          endpoint="/admin/families/" ~ family.rid ~ "?table=wallets",
+          columns=wallets_columns, page=wallets_page,
+          rows_template="_rows_family_wallets.html" %}
+    {% include "_table.html" %}
+  {% endwith %}
 </section>
 
 <section>
   <h2>Categories</h2>
-  {% if categories %}
-  <table class="dt" data-per-page="10">
-    <thead><tr><th>Name</th><th>Kind</th><th>Icon</th><th>Color</th><th data-nosort></th></tr></thead>
-    <tbody>
-      {% for c in categories %}
-      <tr>
-        <td>{{ c.name }}</td>
-        <td>{{ c.kind }}</td>
-        <td>{{ c.icon or '—' }}</td>
-        <td>{{ c.color or '—' }}</td>
-        <td style="white-space:nowrap;">
-          <a href="/admin/categories/{{ c.rid }}/edit">Edit</a>
-          <form method="post" action="/admin/categories/{{ c.rid }}/delete" style="display:inline; margin-left:8px;"
-                onsubmit="return confirm('Delete this category? Its transactions become uncategorized.');">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <input type="hidden" name="family_rid" value="{{ family.rid }}">
-            <button class="btn btn-danger" type="submit" style="padding:3px 9px;">Delete</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}<div class="empty">No categories.</div>{% endif %}
+  {% with table_id="tbl-fam-categories",
+          endpoint="/admin/families/" ~ family.rid ~ "?table=categories",
+          columns=categories_columns, page=categories_page,
+          rows_template="_rows_family_categories.html" %}
+    {% include "_table.html" %}
+  {% endwith %}
   <form method="post" action="/admin/families/{{ family.rid }}/categories" class="toolbar" style="align-items:flex-end; margin-top:12px;">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="field" style="margin:0;"><label>New category</label><input name="name" placeholder="name" required></div>
@@ -99,28 +70,12 @@
 
 <section>
   <h2>Budgets <span class="who">(monthly limit, in VND)</span></h2>
-  {% if budgets %}
-  <table class="dt" data-per-page="10">
-    <thead><tr><th>Category</th><th>Limit (VND)</th><th data-nosort></th></tr></thead>
-    <tbody>
-      {% for b in budgets %}
-      <tr>
-        <td>{{ b.category.name if b.category else '—' }}</td>
-        <td>{{ b.amount }}</td>
-        <td style="white-space:nowrap;">
-          <a href="/admin/budgets/{{ b.rid }}/edit">Edit</a>
-          <form method="post" action="/admin/budgets/{{ b.rid }}/delete" style="display:inline; margin-left:8px;"
-                onsubmit="return confirm('Delete this budget?');">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <input type="hidden" name="family_rid" value="{{ family.rid }}">
-            <button class="btn btn-danger" type="submit" style="padding:3px 9px;">Delete</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}<div class="empty">No budgets.</div>{% endif %}
+  {% with table_id="tbl-fam-budgets",
+          endpoint="/admin/families/" ~ family.rid ~ "?table=budgets",
+          columns=budgets_columns, page=budgets_page,
+          rows_template="_rows_family_budgets.html" %}
+    {% include "_table.html" %}
+  {% endwith %}
   <form method="post" action="/admin/families/{{ family.rid }}/budgets" class="toolbar" style="align-items:flex-end; margin-top:12px;">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="field" style="margin:0;"><label>New budget — category</label>

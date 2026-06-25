@@ -36,23 +36,10 @@
 
 <section>
   <h2>Recent admin activity</h2>
-  {% if recent_audit %}
-  <table class="dt" data-per-page="10">
-    <thead>
-      <tr><th>When</th><th>Action</th><th>Target</th></tr>
-    </thead>
-    <tbody>
-      {% for a in recent_audit %}
-      <tr>
-        <td>{{ a.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-        <td><code>{{ a.action }}</code></td>
-        <td>{{ a.target_type or '' }} {{ a.target_rid or '' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="empty">No admin actions recorded yet.</div>
-  {% endif %}
+  {% with table_id="tbl-dash-audit", endpoint="/admin/audit",
+          columns=audit_columns, page=audit_page,
+          rows_template="_rows_audit.html" %}
+    {% include "_table.html" %}
+  {% endwith %}
 </section>
 {% endblock %}
