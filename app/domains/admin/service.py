@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
 from app.domains.admin.models import AdminAuditLog
-from app.domains.admin.pagination import Page, TableParams
+from app.domains.admin.pagination import Page, TableParams, paginate_iterable
 from app.domains.admin.repository import AdminRepository
 from app.domains.transactions.models import Transaction, TransactionType
 from app.domains.transactions.repository import TransactionRepository
@@ -105,9 +105,98 @@ class AdminService:
         return self._repo.audit_page(params)
 
     def transactions_dt(
-        self, params: TableParams, *, wallet_id: int | None = None
+        self,
+        params: TableParams,
+        *,
+        wallet_id: int | None = None,
+        created_by_user_id: int | None = None,
     ) -> Page:
-        return self._repo.transactions_dt(params, wallet_id=wallet_id)
+        return self._repo.transactions_dt(
+            params, wallet_id=wallet_id, created_by_user_id=created_by_user_id
+        )
+
+    # --- in-memory pages for the small, derived embedded tables --------------
+
+    def user_wallets_page(self, user: User, params: TableParams) -> Page:
+        return paginate_iterable(
+            self.user_wallets(user),
+            params,
+            sort_keys={
+                "name": lambda r: r["wallet"].name,
+                "currency": lambda r: r["wallet"].currency,
+                "visibility": lambda r: r["wallet"].visibility,
+                "balance": lambda r: r["balance"],
+            },
+            search_text=lambda r: r["wallet"].name,
+        )
+
+    def family_members_page(self, family, params: TableParams) -> Page:  # type: ignore[no-untyped-def]
+        from app.domains.families.repository import FamilyRepository
+
+        rows = FamilyRepository(self._session).list_active_members(family.id)
+        return paginate_iterable(
+            rows,
+            params,
+            sort_keys={
+                "display_name": lambda m: m.display_name,
+                "email": lambda m: m.email,
+                "role": lambda m: m.role,
+            },
+            search_text=lambda m: f"{m.display_name} {m.email}",
+        )
+
+    def family_wallets_page(self, family, params: TableParams) -> Page:  # type: ignore[no-untyped-def]
+        wallets = self._repo.family_wallets(family.id)
+        balances = self._wallets.balances_by_wallet([w.id for w in wallets])
+        rows = [{"wallet": w, "balance": balances.get(w.id, 0)} for w in wallets]
+        return paginate_iterable(
+            rows,
+            params,
+            sort_keys={
+                "name": lambda r: r["wallet"].name,
+                "currency": lambda r: r["wallet"].currency,
+                "balance": lambda r: r["balance"],
+            },
+            search_text=lambda r: r["wallet"].name,
+        )
+
+    def family_categories_page(self, family, params: TableParams) -> Page:  # type: ignore[no-untyped-def]
+        return paginate_iterable(
+            self._repo.family_categories(family.id),
+            params,
+            sort_keys={"name": lambda c: c.name, "kind": lambda c: c.kind},
+            search_text=lambda c: c.name,
+        )
+
+    def family_categories_all(self, family):  # type: ignore[no-untyped-def]
+        """The full (unpaginated) category list — for the add-budget dropdown."""
+        return self._repo.family_categories(family.id)
+
+    def family_budgets_page(self, family, params: TableParams) -> Page:  # type: ignore[no-untyped-def]
+        return paginate_iterable(
+            self._repo.family_budgets(family.id),
+            params,
+            sort_keys={
+                "category": lambda b: (b.category.name if b.category else ""),
+                "amount": lambda b: b.amount,
+            },
+            search_text=lambda b: (b.category.name if b.category else ""),
+        )
+
+    def deps_alerts_page(
+        self, alerts: list[dict[str, object]], params: TableParams
+    ) -> Page:
+        return paginate_iterable(
+            alerts,
+            params,
+            sort_keys={
+                "package": lambda a: a["package"],
+                "ecosystem": lambda a: a["ecosystem"],
+                "severity": lambda a: a["severity"],
+                "created_at": lambda a: a["created_at"],
+            },
+            search_text=lambda a: str(a["package"]),
+        )
 
     def log(
         self,

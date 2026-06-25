@@ -1,0 +1,15 @@
+<tbody class="dt-body">
+  {% if page.items %}
+  {% for t in page.items %}
+  <tr>
+    <td>{{ t.occurred_on.isoformat() }}</td>
+    <td><a href="/admin/wallets/{{ t.wallet.rid }}">{{ t.wallet.name }}</a></td>
+    <td>{{ t.type }}</td>
+    <td>{{ t.amount | money(t.wallet.currency) }} {{ t.wallet.currency }}</td>
+    <td>{{ t.note or '' }}</td>
+  </tr>
+  {% endfor %}
+  {% else %}
+  <tr><td colspan="{{ columns|length }}" class="dt-empty">No transactions.</td></tr>
+  {% endif %}
+</tbody>

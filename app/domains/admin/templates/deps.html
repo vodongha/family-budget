@@ -34,27 +34,15 @@
   <h2>{{ r.repo }}</h2>
   {% if not r.ok %}
     <div class="flash flash-error">Couldn't read alerts: {{ r.error }}</div>
-  {% elif not r.alerts %}
+  {% elif r.repo not in deps_pages %}
     <div class="flash flash-ok">No open Dependabot alerts. 🎉</div>
   {% else %}
-  <table class="dt" data-per-page="25">
-    <thead>
-      <tr><th>Package</th><th>Ecosystem</th><th>Severity</th><th>Vulnerable</th><th>Patched</th><th>Opened</th><th data-nosort></th></tr>
-    </thead>
-    <tbody>
-      {% for a in r.alerts %}
-      <tr>
-        <td>{{ a.package }}</td>
-        <td>{{ a.ecosystem }}</td>
-        <td>{{ sev_pill(a.severity) }}</td>
-        <td>{{ a.vulnerable_range or '—' }}</td>
-        <td>{{ a.patched or '—' }}</td>
-        <td>{{ a.created_at }}</td>
-        <td>{% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener">View</a>{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  {% with table_id="tbl-deps-" ~ loop.index,
+          endpoint="/admin/dependencies?repo=" ~ r.repo,
+          columns=deps_columns, page=deps_pages[r.repo],
+          rows_template="_rows_deps.html" %}
+    {% include "_table.html" %}
+  {% endwith %}
   {% endif %}
 </section>
 {% endfor %}

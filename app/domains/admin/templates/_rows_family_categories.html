@@ -1,0 +1,23 @@
+<tbody class="dt-body">
+  {% if page.items %}
+  {% for c in page.items %}
+  <tr>
+    <td>{{ c.name }}</td>
+    <td>{{ c.kind }}</td>
+    <td>{{ c.icon or '—' }}</td>
+    <td>{{ c.color or '—' }}</td>
+    <td style="white-space:nowrap;">
+      <a href="/admin/categories/{{ c.rid }}/edit">Edit</a>
+      <form method="post" action="/admin/categories/{{ c.rid }}/delete" style="display:inline; margin-left:8px;"
+            onsubmit="return confirm('Delete this category? Its transactions become uncategorized.');">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="family_rid" value="{{ family.rid }}">
+        <button class="btn btn-danger" type="submit" style="padding:3px 9px;">Delete</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  {% else %}
+  <tr><td colspan="{{ columns|length }}" class="dt-empty">No categories.</td></tr>
+  {% endif %}
+</tbody>

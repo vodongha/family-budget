@@ -9,6 +9,7 @@ keys, page size) — untrusted input never reaches an ``ORDER BY`` column — an
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from math import ceil
 from typing import Any
@@ -166,3 +167,40 @@ def paginate(
         stmt = stmt.options(*options)
     items = list(session.scalars(stmt).all())
     return Page(items=items, total=total, params=params)
+
+
+def _sortable(value: Any) -> tuple[bool, Any]:
+    """A sort key that tolerates ``None`` and mixed string casing within one
+    (homogeneous) column. ``None`` sorts before real values; strings compare
+    case-insensitively."""
+    if value is None:
+        return (False, "")
+    if isinstance(value, str):
+        return (True, value.lower())
+    return (True, value)
+
+
+def paginate_iterable(
+    items: Iterable[Any],
+    params: TableParams,
+    *,
+    sort_keys: dict[str, Callable[[Any], Any]],
+    search_text: Callable[[Any], str] | None = None,
+) -> Page:
+    """In-memory equivalent of :func:`paginate` for the small, **derived** tables
+    (a user's wallets, a family's members/categories/budgets, the dependency
+    report) whose rows aren't a plain DB query. Bounded data only — it materialises
+    the whole list, then searches / sorts / slices it in Python.
+    """
+    data = list(items)
+    if params.q and search_text is not None:
+        needle = params.q.lower()
+        data = [it for it in data if needle in (search_text(it) or "").lower()]
+    total = len(data)
+    key = sort_keys.get(params.sort)
+    if key is not None:
+        data.sort(key=lambda it: _sortable(key(it)), reverse=params.descending)
+    start = params.offset
+    return Page(
+        items=data[start : start + params.per_page], total=total, params=params
+    )

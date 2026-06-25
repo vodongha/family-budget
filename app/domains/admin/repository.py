@@ -169,11 +169,17 @@ class AdminRepository:
         )
 
     def transactions_dt(
-        self, params: TableParams, *, wallet_id: int | None = None
+        self,
+        params: TableParams,
+        *,
+        wallet_id: int | None = None,
+        created_by_user_id: int | None = None,
     ) -> Page:
         base = select(Transaction)
         if wallet_id is not None:
             base = base.where(Transaction.wallet_id == wallet_id)
+        if created_by_user_id is not None:
+            base = base.where(Transaction.created_by_user_id == created_by_user_id)
         return paginate(
             self._session,
             base,

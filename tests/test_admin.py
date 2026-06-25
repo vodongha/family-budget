@@ -564,3 +564,42 @@ def test_table_sort_param_is_whitelisted(
     _login(client)
     res = client.get("/admin/users?partial=1&sort=__injection__&dir=desc")
     assert res.status_code == 200
+
+
+def test_user_detail_table_partials(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    owner = _make_user(db_session, email="ud@example.com")
+    _make_wallet(db_session, owner)
+    _login(client)
+
+    wallets = client.get(f"/admin/users/{owner.rid}?partial=1&table=wallets")
+    assert wallets.status_code == 200
+    assert "<tbody" in wallets.text
+    assert "Cash" in wallets.text
+    assert 'class="sidebar"' not in wallets.text
+
+    txns = client.get(f"/admin/users/{owner.rid}?partial=1&table=txns")
+    assert txns.status_code == 200
+    assert "dt-foot" in txns.text
+
+
+def test_family_detail_table_partials(client: TestClient, db_session: Session) -> None:
+    _make_admin(db_session)
+    fam = _make_family(db_session)
+    _login(client)
+    for table in ("members", "wallets", "categories", "budgets"):
+        res = client.get(f"/admin/families/{fam.rid}?partial=1&table={table}")
+        assert res.status_code == 200, table
+        assert "<tbody" in res.text
+        assert 'class="sidebar"' not in res.text
+
+
+def test_dashboard_recent_activity_is_server_side(
+    client: TestClient, db_session: Session
+) -> None:
+    _make_admin(db_session)
+    _login(client)
+    res = client.get("/admin")
+    assert res.status_code == 200
+    assert 'id="tbl-dash-audit"' in res.text
+    assert "dt-server" in res.text
