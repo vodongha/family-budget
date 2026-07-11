@@ -503,7 +503,7 @@ Two long-lived branches (mirrors `vodongha-personal`):
 
 ```
 feature/* ──┐
-bug/*    ──→  develop  →  PR → develop (merged)  →  PR → master  →  Fly.io auto-deploy
+bug/*    ──→  develop  →  PR → develop (merged)  →  PR → master  →  home-server auto-deploy
                                                                           ↓
 hotfix/* ──────────────────────────────────────────────→  PR → master    ↓
                                                                     develop ← auto-synced by sync-develop.yml
@@ -541,18 +541,20 @@ GIT_COMMITTER_NAME="Claude Opus 4.8" GIT_COMMITTER_EMAIL="noreply@anthropic.com"
   git commit --author="vodongha <vodongha@hotmail.com>" -m "..."
 ```
 
-## Deployment (Fly.io)
+## Deployment (self-hosted)
 
-Production runs on **Fly.io**, region `sin` (Singapore — closest to ADB), domain `famo.io.vn`.
+Production is **self-hosted with Docker on a home server**, public via a **Cloudflare Tunnel** at `famo.io.vn` (`localhost:8000`). Oracle ADB (cloud) is unchanged.
 
-- **CI/CD:** `.github/workflows/deploy.yml` deploys on push to `master` (ruff + pytest →
-  `flyctl deploy --remote-only`, needs the `FLY_API_TOKEN` repo secret). `ci.yml` runs the same
+- **CI/CD:** `.github/workflows/deploy.yml` runs on push to `master` (ruff + pytest), then the
+  `deploy` job POSTs to the home-server webhook (`https://hooks.vodongha.id.vn/deploy/family-budget`,
+  `Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}`). The receiver runs `alembic upgrade head`
+  (one-off `api` container) then `docker compose up -d --build`. `ci.yml` runs the same
   checks on pushes to `develop` and PRs into `develop`/`master`. `sync-develop.yml` merges `master → develop`
   after each deploy. Mirrors the `vodongha-personal` website setup.
-- **`fly.toml`:** two process groups from one image — `app` (FastAPI, the only HTTP group;
-  `auto_stop = suspend`, `min_machines_running = 0`) and `worker` (`celery worker --beat`, runs
-  continuously so the scheduled jobs fire). `[deploy] release_command = "alembic upgrade head"`
-  migrates before each release. VM 512MB each. The beat schedule (`app/core/celery_app.py`) uses
+- **Processes (docker-compose):** `api` (FastAPI, HTTP), `worker` + `beat` (Celery), plus local
+  `redis` (broker) and `minio`; all `restart: unless-stopped` so the worker/beat run
+  continuously and the scheduled jobs fire. The auto-deploy runs `alembic upgrade head` before
+  starting (compose has no `release_command` step like Fly did). The beat schedule (`app/core/celery_app.py`) uses
   **crontab** clock times (rates refresh 00:00 + 12:00 ICT, account purge 03:00 ICT) — not relative
   intervals, which reset their countdown on every worker restart (each deploy), so frequent deploys
   would otherwise keep postponing the run.
