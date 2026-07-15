@@ -9,6 +9,53 @@
   {% else %}<span class="pill" style="background:var(--surface-2); color:var(--muted);">{{ s or '—' }}</span>{% endif %}
 {% endmacro %}
 
+{% macro lib_table(title, rows) %}
+<section>
+  <h2>{{ title }}</h2>
+  {% if not rows %}
+    <div class="flash flash-warn">No data — try <a href="/admin/dependencies?refresh=1">refresh</a>.</div>
+  {% else %}
+  <div style="overflow-x:auto;">
+  <table style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr style="text-align:left; color:var(--muted);">
+        <th style="padding:6px 10px;">Package</th>
+        <th style="padding:6px 10px;">Current</th>
+        <th style="padding:6px 10px;">Latest</th>
+        <th style="padding:6px 10px;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in rows %}
+      <tr style="border-top:1px solid var(--border, #2a2a2a);">
+        <td style="padding:6px 10px;">{{ l.name }}</td>
+        <td style="padding:6px 10px;">{{ l.current }}</td>
+        <td style="padding:6px 10px;">{{ l.latest }}</td>
+        <td style="padding:6px 10px;">
+          {% if l.outdated %}<span class="pill pill-warn">Outdated</span>
+          {% elif l.note %}<span class="pill" style="background:var(--surface-2); color:var(--muted);">{{ l.note }}</span>
+          {% else %}<span class="pill flash-ok" style="border:none;">Up to date</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+{% endmacro %}
+
+<div class="toolbar">
+  <a class="btn" href="/admin/dependencies?refresh=1">↻ Refresh</a>
+  <span class="who">Cached 1h · libraries updated {{ libs.generated_at }}</span>
+</div>
+
+<h2 style="margin-top:8px;">Libraries — current vs latest</h2>
+{{ lib_table('Backend · pip → PyPI', libs.pip) }}
+{{ lib_table('App · pub.dev' ~ (' · ' ~ libs.app_repo if libs.app_repo else ''), libs.pub) }}
+
+<h2 style="margin-top:28px;">Security — Dependabot alerts</h2>
+
 {% if not report.configured %}
 <div class="flash flash-warn" style="margin-bottom:18px;">
   <strong>Not configured.</strong> Set a GitHub token to read Dependabot alerts.
@@ -24,11 +71,6 @@
   </div>
 </div>
 {% else %}
-<div class="toolbar">
-  <a class="btn" href="/admin/dependencies?refresh=1">↻ Refresh</a>
-  <span class="who">Cached up to 1 hour · GitHub Dependabot</span>
-</div>
-
 {% for r in report.repos %}
 <section>
   <h2>{{ r.repo }}</h2>

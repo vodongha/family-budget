@@ -19,7 +19,7 @@ from starlette.status import HTTP_303_SEE_OTHER
 
 from app.core.config import settings
 from app.core.deps import SessionDep
-from app.domains.admin.deps_panel import dependency_report
+from app.domains.admin.deps_panel import dependency_report, library_report
 from app.domains.admin.money import to_major, to_minor
 from app.domains.admin.pagination import is_partial, table_params
 from app.domains.admin.repository import (
@@ -1416,6 +1416,7 @@ def dependencies_page(
             "deps",
             crumbs=[{"label": "Dependencies"}],
             report=report,
+            libs=library_report(force=force),
             deps_pages=deps_pages,
             deps_columns=_DEPS_COLUMNS,
         ),
