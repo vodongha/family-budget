@@ -4,35 +4,35 @@ version = "0.1.0"
 description = "Family expense tracker — FastAPI + SQLAlchemy + Oracle ADB backend"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.32",
+    "fastapi>=0.139.0",
+    "uvicorn[standard]>=0.51.0",
     # Admin panel: server-rendered templates + signed session cookies, with the
     # stylesheet compiled from SCSS (styles/*.scss → static/admin.css) at startup.
-    "jinja2>=3.1",
-    "itsdangerous>=2.2",
-    "libsass>=0.23",
-    "sqlalchemy>=2.0.36",
-    "oracledb>=2.5",
-    "alembic>=1.14",
-    "pydantic[email]>=2.10",
-    "pydantic-settings>=2.7",
-    "phonenumbers>=8.13",
-    "python-jose[cryptography]>=3.3",
-    "google-auth>=2.35",
-    "requests>=2.32",
-    "bcrypt>=4.1",
-    "python-multipart>=0.0.20",
-    "python-ulid>=3.0",
-    "celery>=5.4",
-    "redis>=5.2",
+    "jinja2>=3.1.6",
+    "itsdangerous>=2.2.0",
+    "libsass>=0.23.0",
+    "sqlalchemy>=2.0.51",
+    "oracledb>=4.0.2",
+    "alembic>=1.18.5",
+    "pydantic[email]>=2.13.4",
+    "pydantic-settings>=2.14.2",
+    "phonenumbers>=9.0.34",
+    "python-jose[cryptography]>=3.5.0",
+    "google-auth>=2.56.0",
+    "requests>=2.34.2",
+    "bcrypt>=5.0.0",
+    "python-multipart>=0.0.32",
+    "python-ulid>=3.1.0",
+    "celery>=5.6.3",
+    "redis>=8.0.1",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.3",
-    "httpx>=0.28",
-    "ruff>=0.8",
-    "mypy>=1.13",
+    "pytest>=9.1.1",
+    "httpx>=0.28.1",
+    "ruff>=0.15.21",
+    "mypy>=2.3.0",
 ]
 
 [build-system]
