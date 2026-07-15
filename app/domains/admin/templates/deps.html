@@ -19,7 +19,7 @@
     1. Enable <em>Dependabot alerts</em> on each repo (GitHub → Settings → Code security).<br>
     2. Create a token with read access to Dependabot alerts (classic <code>repo</code>/<code>security_events</code>,
        or a fine-grained token with <code>Dependabot alerts: read</code>).<br>
-    3. <code>fly secrets set GITHUB_TOKEN=... -a famo</code> &nbsp;(repos: <code>{{ report.repos | map(attribute='repo') | join(', ') }}</code>,
+    3. Add <code>GITHUB_TOKEN=...</code> to the server's <code>.env</code> and redeploy &nbsp;(repos: <code>{{ report.repos | map(attribute='repo') | join(', ') }}</code>,
        configurable via <code>GITHUB_REPOS</code>).
   </div>
 </div>
